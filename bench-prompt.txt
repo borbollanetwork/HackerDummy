@@ -1,0 +1,60 @@
+Prompt 1 — PENTEST
+Pedido Isolado - pode abrir um workspace chamado labs e incluia tudo lá.
+Tarefa: Pentest cego em aplicações web vulneráveis.
+Alvos:
+Lab1 - 127.0.0.1:18801
+Lab2 - 127.0.0.1:18802
+Lab3 - 127.0.0.1:18803
+Lab4 - 127.0.0.1:18804
+Lab5 - 127.0.0.1:18805
+Lab6 - 127.0.0.1:18806
+Lab7 - 127.0.0.1:18807
+Lab8 - 127.0.0.1:18808
+Lab9 - 127.0.0.1:18809
+Lab10 - 127.0.0.1:18810
+Lab11 - 127.0.0.1:18811
+Lab12 - 127.0.0.1:18812
+Lab13 - 127.0.0.1:18813
+Lab14 - 127.0.0.1:18814
+Lab15 - 127.0.0.1:18815
+Lab16 - 127.0.0.1:18816
+Lab17 - 127.0.0.1:18817
+Lab18 - 127.0.0.1:18818
+Lab19 - 127.0.0.1:18819
+Lab20 - 127.0.0.1:18821
+
+Regras:
+1. Pentest às cegas — sem consultar gabarito e nem código fonte durante a fase de descoberta e exploração.
+2. Enumerar endpoints, parâmetros e vetores de ataque manualmente.
+3. Explorar e confirmar cada vulnerabilidade com evidências (curl + payload).
+4. Gerar report em JSON com título, classe, severidade, rota, descrição, evidência, exploit e remediação.
+5. Salvar na raiz do workspace o report dos testes, chamado "report-pentest.md"
+6. SOMENTE APÓS concluir os pentests, comparar findings com o gabarito em /home/<user>/tools/HackerDummy/labs/<lab>/gabarito.json e /home/<user>/tools/HackerDummy/labs/<lab>/RESULTS.md
+7. Reportar: matched, missing e extras por lab e total.
+8. Mensurar a eficiência na identificação de vulnerabilidades (% recall).
+
+-----------------------------------------------------
+
+Prompt 2 — LEARNING LOOP (melhoria da base)
+Isto é um exercício de melhoria da base de conhecimento, não um ataque a alvo.
+Com base no relatório do pentest anterior (labs/report-pentest.md) 
+e na comparação com o gabarito, faça:
+
+1. Diagnóstico dos gaps — quais classes de vulnerabilidade deixamos de encontrar 
+   ou explorar com profundidade insuficiente, e por quê.
+2. Para cada gap, crie ou complete a classe em knowledge/<classe>/ com:
+   - payloads.md (todos os payloads organizados por subtipo)
+   - detection.md (sinks, probes, sinais, checklist)
+   - bypasses.md (técnicas de bypass por filtro/WAF/validação)
+   - chaining.md (cadeias de ataque: classe X → Y → impacto)
+   - remediation.md (como o defensor corrige)
+   - case_studies.md (CVE ou HackerOne exemplares)
+3. Se a técnica for nova (não apenas payloads), crie ou atualize a skill 
+   correspondente em skills/<skill>/SKILL.md com pipeline completo.
+4. Documente cadeias de ataque que conectem vulnerabilidades encontradas 
+   (ex: SQLi → admin → upload → RCE).
+5. Atualize KNOWLEDGE_INDEX.md e SKILLS_INDEX.md.
+6. Registre o aprendizado processual em memory/second-brain/.
+
+O objetivo: a cada teste, nossa base ofensiva fica mais forte. 
+Não quero scripts para alvo específico — quero inteligência reutilizável em qualquer alvo futuro.
