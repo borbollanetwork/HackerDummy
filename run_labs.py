@@ -11,7 +11,7 @@ Each port is a different lab. No manual PHP spin-up needed.
 Process control and port detection are cross-platform:
   - spawn:  POSIX -> start_new_session; Windows -> CREATE_NEW_PROCESS_GROUP
   - alive:  Popen.poll()  (no /proc dependency)
-  - port:   parse the lab's startup log for its URL, confirm with a TCP probe
+  - port:   probe the target port declared by each lab (log parsing is fallback)
   - kill:   POSIX -> killpg(SIGTERM/SIGKILL); Windows -> taskkill /F /T
 
 Mobile labs (labs/mobile/*) are STATIC artifacts (no server) and are not booted
@@ -45,6 +45,15 @@ COLS = [("LAB", 5), ("Pasta", 30), ("Status", 8), ("Port", 24)]
 
 _URL_RE = re.compile(
     r"(?:http://)?(?:127\.0\.0\.1|0\.0\.0\.0|localhost|\[[^\]]+\]):(\d{2,5})")
+
+# Most labs use 18800 + the numeric folder prefix.  These two are intentional
+# exceptions in the lab sources: OpenServices exposes its HTTP target on 8080
+# (plus seven standard infrastructure ports), while SmuggleForge reserves 18820
+# for its internal back-end, so GraphForge uses 18821.
+_TARGET_PORT_OVERRIDES = {
+    "06-openservices": 8080,
+    "20-graphforge": 18821,
+}
 
 
 class C:
@@ -117,9 +126,21 @@ def command_to_string(command):
     return "python app.py" if command[0] == PYTHON_BIN else " ".join(command)
 
 
-def lab_sort_key(folder):
+def lab_number(folder):
     m = re.match(r"^(\d+)-", folder.name)
-    return int(m.group(1)) if m else 9999
+    return int(m.group(1)) if m else None
+
+
+def lab_sort_key(folder):
+    return lab_number(folder) or 9999
+
+
+def target_port_for(folder):
+    """Return the user-facing TCP port configured by the lab source."""
+    number = lab_number(folder)
+    if number is None:
+        return None
+    return _TARGET_PORT_OVERRIDES.get(folder.name, 18800 + number)
 
 
 def discover_labs():
@@ -162,16 +183,20 @@ def port_from_log(log_file, offset=0):
     return f"127.0.0.1:{matches[-1]}" if matches else None
 
 
-def wait_for_port(proc, log_file, offset, timeout):
+def wait_for_port(proc, log_file, offset, timeout, expected_port=None):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if proc.poll() is not None:
             return None
-        port = port_from_log(log_file, offset)
-        if port and _tcp_open(port.split(":")[1]):
-            return port
+        if expected_port is not None:
+            if _tcp_open(expected_port):
+                return f"127.0.0.1:{expected_port}"
+        else:
+            port = port_from_log(log_file, offset)
+            if port and _tcp_open(port.split(":")[1]):
+                return port
         time.sleep(0.2)
-    return port_from_log(log_file, offset)
+    return None
 
 
 def stop_proc(lab):
@@ -201,7 +226,8 @@ def start_labs(use_color, startup_timeout):
         print(paint("[!] Nenhum lab executável encontrado em ./labs", C.RED, use_color))
         sys.exit(1)
     table_header(use_color)
-    for index, folder in enumerate(lab_dirs, start=1):
+    for position, folder in enumerate(lab_dirs, start=1):
+        index = lab_number(folder) or position
         command = resolve_lab_command(folder)
         log_file = LOG_DIR / f"{folder.name}.log"
         offset = log_file.stat().st_size if log_file.exists() else 0
@@ -212,7 +238,10 @@ def start_labs(use_color, startup_timeout):
                 proc = _popen(command, folder, log)
             lab = {"index": index, "folder": folder, "process": proc, "log_file": log_file}
             processes.append(lab)
-            port = wait_for_port(proc, log_file, offset, startup_timeout)
+            port = wait_for_port(
+                proc, log_file, offset, startup_timeout,
+                expected_port=target_port_for(folder),
+            )
             alive = proc.poll() is None
             table_row(index, folder.name, "UP" if alive else "DOWN", port or "N/A", use_color)
         except Exception as exc:
