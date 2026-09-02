@@ -39,6 +39,14 @@ CSRF_TOKEN = secrets.token_urlsafe(32)
 
 _URL_RE = re.compile(r"(?:http://)?(?:127\.0\.0\.1|0\.0\.0\.0|localhost|\[[^\]]+\]):(\d{2,5})")
 
+# Most labs use 18800 + the numeric folder prefix.  OpenServices intentionally
+# exposes its HTTP target on 8080 (plus seven standard infrastructure ports).
+# SmuggleForge uses 18820 for its internal back-end, so GraphForge uses 18821.
+_TARGET_PORT_OVERRIDES = {
+    "06-openservices": 8080,
+    "20-graphforge": 18821,
+}
+
 # surface descriptions (vuln counts come from each lab's gabarito.json at runtime)
 LAB_METADATA = {
     "01-vulnshop": "Classic web injection: SQLi, XSS, IDOR, SSRF, open-redirect, exposed .git/.env/backup, dir-listing, headers, cookie, info-disc, admin panel.",
@@ -83,9 +91,21 @@ def resolve_command(folder):
     return None
 
 
-def sort_key(folder):
+def lab_number(folder):
     m = re.match(r"^(\d+)-", folder.name)
-    return int(m.group(1)) if m else 9999
+    return int(m.group(1)) if m else None
+
+
+def sort_key(folder):
+    return lab_number(folder) or 9999
+
+
+def target_port_for(folder):
+    """Return the user-facing TCP port configured by the lab source."""
+    number = lab_number(folder)
+    if number is None:
+        return None
+    return _TARGET_PORT_OVERRIDES.get(folder.name, 18800 + number)
 
 
 def discover():
@@ -110,13 +130,19 @@ def vuln_count(folder):
 def refresh_inventory():
     with _LOCK:
         live = set()
-        for i, folder in enumerate(discover(), start=1):
+        for position, folder in enumerate(discover(), start=1):
+            index = lab_number(folder) or position
+            target_port = target_port_for(folder)
             live.add(folder.name)
             if folder.name not in LABS:
-                LABS[folder.name] = {"index": i, "folder": folder, "command": resolve_command(folder),
-                                     "process": None, "log_file": LOG_DIR / f"{folder.name}.log"}
+                LABS[folder.name] = {"index": index, "folder": folder,
+                                     "command": resolve_command(folder),
+                                     "target_port": target_port, "process": None,
+                                     "log_file": LOG_DIR / f"{folder.name}.log"}
             else:
-                LABS[folder.name].update(index=i, folder=folder, command=resolve_command(folder))
+                LABS[folder.name].update(index=index, folder=folder,
+                                         command=resolve_command(folder),
+                                         target_port=target_port)
 
 
 def is_alive(lab):
@@ -133,6 +159,9 @@ def tcp_open(port, timeout=0.3):
 
 
 def detect_port(lab):
+    target_port = lab.get("target_port")
+    if target_port is not None:
+        return f"127.0.0.1:{target_port}" if tcp_open(target_port) else None
     try:
         size = lab["log_file"].stat().st_size
         with open(lab["log_file"], "rb") as f:
