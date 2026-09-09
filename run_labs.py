@@ -14,8 +14,9 @@ Process control and port detection are cross-platform:
   - port:   probe the target port declared by each lab (log parsing is fallback)
   - kill:   POSIX -> killpg(SIGTERM/SIGKILL); Windows -> taskkill /F /T
 
-Mobile labs (labs/mobile/*) are STATIC artifacts (no server) and are not booted
-here — analyze them with jadx/apktool. See labs/mobile/MOBILE.md.
+Mobile labs (labs/mobile/*) are STATIC artifacts (no server): they are listed in
+the table with status STATIC (not booted) — analyze them with jadx/apktool.
+See labs/mobile/MOBILE.md.
 
     python run_labs.py            # boot all, CTRL+C to stop
     python run_labs.py --timeout 8
@@ -33,6 +34,7 @@ from datetime import datetime
 
 ROOT_DIR = Path(__file__).resolve().parent
 LABS_DIR = ROOT_DIR / "labs"
+MOBILE_DIR = LABS_DIR / "mobile"
 LOG_DIR = ROOT_DIR / ".lab_logs"
 PYTHON_BIN = sys.executable
 IS_WIN = os.name == "nt"
@@ -97,7 +99,12 @@ def table_header(use_color):
 
 
 def table_row(lab, folder, status, port, use_color):
-    status_color = C.BOLD + C.GREEN if status == "UP" else C.BOLD + C.RED
+    if status == "UP":
+        status_color = C.BOLD + C.GREEN
+    elif status == "STATIC":
+        status_color = C.BOLD + C.YELLOW
+    else:
+        status_color = C.BOLD + C.RED
     port_color = C.CYAN if port.startswith("127.0.0.1:") else C.DIM + C.WHITE
     values = [(str(lab), C.WHITE), (folder, C.WHITE), (status, status_color), (port, port_color)]
     row = paint("│", C.BLUE, use_color)
@@ -149,6 +156,14 @@ def discover_labs():
         sys.exit(1)
     found = [f for f in LABS_DIR.iterdir() if f.is_dir() and resolve_lab_command(f)]
     return sorted(found, key=lab_sort_key)
+
+
+def discover_mobile():
+    """Mobile labs are STATIC APK trees (no server): a folder with gabarito.json."""
+    if not MOBILE_DIR.exists():
+        return []
+    found = [f for f in MOBILE_DIR.iterdir() if f.is_dir() and (f / "gabarito.json").is_file()]
+    return sorted(found, key=lambda f: f.name)
 
 
 def _popen(command, cwd, log):
@@ -248,7 +263,32 @@ def start_labs(use_color, startup_timeout):
             with open(log_file, "ab", buffering=0) as log:
                 log.write(f"ERROR: {exc}\n".encode())
             table_row(index, folder.name, "DOWN", "N/A", use_color)
+    # Mobile labs: artefatos estáticos (APK decompilado), não são iniciados aqui.
+    for folder in discover_mobile():
+        m = re.match(r"^(M\d+)-", folder.name)
+        tag = m.group(1) if m else "MOB"
+        table_row(tag, f"mobile/{folder.name}", "STATIC", "jadx/apktool", use_color)
     _border("└", "┴", "┘", use_color)
+
+
+def run_lock(action, use_color):
+    """Trava/destrava os gabaritos via benchmark-lock.sh (fonte única da lógica).
+
+    lock roda no start (pentest às cegas); unlock roda só no CTRL+C — o operador,
+    não o agente, controla o cadeado. Em Windows exige bash (WSL/Git-Bash).
+    """
+    script = ROOT_DIR / "benchmark-lock.sh"
+    if not script.is_file():
+        return
+    if IS_WIN and not os.environ.get("SHELL"):
+        print(paint(f"[!] auto-{action} precisa de bash; trave/destrave manualmente (ver README).",
+                    C.YELLOW, use_color))
+        return
+    try:
+        subprocess.run(["bash", str(script), action], cwd=str(ROOT_DIR),
+                       env={**os.environ, "HACKERDUMMY_ROOT": str(ROOT_DIR)}, check=False)
+    except Exception as exc:
+        print(paint(f"[!] benchmark-lock {action} falhou: {exc}", C.RED, use_color))
 
 
 def stop_labs(use_color):
@@ -261,6 +301,8 @@ def stop_labs(use_color):
         if lab["process"].poll() is None:
             print(paint("[STOP]", C.YELLOW, use_color), f"LAB {lab['index']} - {lab['folder'].name}")
             stop_proc(lab)
+    print("\n" + paint("[!] Destravando gabaritos (unlock)...", C.BOLD + C.YELLOW, use_color))
+    run_lock("unlock", use_color)
     print("\n" + paint("[+] Todos os labs foram finalizados.", C.BOLD + C.GREEN, use_color))
     print(paint(f"[+] Logs: {LOG_DIR}", C.DIM + C.WHITE, use_color))
 
@@ -284,9 +326,12 @@ def main():
         pass
     print("\033c", end="")
     banner(USE_COLOR)
+    print(paint("[*] Travando gabaritos p/ pentest às cegas (lock)...", C.BOLD + C.CYAN, USE_COLOR))
+    run_lock("lock", USE_COLOR)
+    print()
     start_labs(USE_COLOR, args.timeout)
     print("\n" + paint("[+] Todos os labs disponíveis foram processados.", C.BOLD + C.GREEN, USE_COLOR))
-    print(paint("[+] Pressione CTRL+C para derrubar tudo.", C.BOLD + C.YELLOW, USE_COLOR))
+    print(paint("[+] Gabaritos TRAVADOS. Dê CTRL+C só quando o agente terminar o pentest — o unlock libera o gabarito p/ a Comparação.", C.BOLD + C.YELLOW, USE_COLOR))
     print(paint(f"[+] Logs: {LOG_DIR}\n", C.DIM + C.WHITE, USE_COLOR))
     try:
         while True:
