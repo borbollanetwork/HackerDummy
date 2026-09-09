@@ -9,8 +9,9 @@ surface. No Flask, no pip install — pure http.server, runs on Windows/Linux/ma
     python ctf_platform.py                 # -> http://127.0.0.1:8088
     python ctf_platform.py --port 9000
 
-Mobile labs (labs/mobile/*) are static artifacts (no server) and aren't booted
-here; analyze them with jadx/apktool. See labs/mobile/MOBILE.md.
+Mobile labs (labs/mobile/*) are static artifacts (no server): they appear as
+STATIC cards (no start/stop) — analyze them with jadx/apktool. See
+labs/mobile/MOBILE.md.
 
 Bind stays on 127.0.0.1 by default. State-changing calls require an X-CTF-Token
 header (issued to the page) so a random localhost page can't drive your labs.
@@ -32,6 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT_DIR = Path(__file__).resolve().parent
 LABS_DIR = ROOT_DIR / "labs"
+MOBILE_DIR = LABS_DIR / "mobile"
 LOG_DIR = ROOT_DIR / ".lab_logs"
 PYTHON_BIN = sys.executable
 IS_WIN = os.name == "nt"
@@ -69,6 +71,9 @@ LAB_METADATA = {
     "18-javaforge": "Java / Tomcat: native deserialization (rO0AB) -> RCE, default Manager creds, verbose Java stack traces, EOL stack.",
     "19-smuggleforge": "HTTP request smuggling: genuine CL.TE front-end/back-end desync, Server-banner disclosure, missing headers.",
     "20-graphforge": "Advanced GraphQL: alias cost-amplification DoS, unauth promoteToAdmin (BFLA), GraphQL CSRF via GET/form, introspection.",
+    # Mobile labs are STATIC APK trees (jadx/apktool), analyzed offline — no server.
+    "M01-leakyvault": "Android APK (static): android:debuggable, exported components, allowBackup, cleartext traffic, hardcoded secrets in smali/strings, world-readable SharedPreferences.",
+    "M02-storagecrypt": "Android APK (static): insecure local storage (world-readable prefs, cleartext SQLite) + broken crypto (ECB/DES/MD5, hardcoded key/IV, weak PRNG).",
 }
 
 _LOCK = threading.RLock()
@@ -114,6 +119,14 @@ def discover():
     return sorted((f for f in LABS_DIR.iterdir() if f.is_dir() and resolve_command(f)), key=sort_key)
 
 
+def discover_mobile():
+    """Mobile labs are STATIC APK trees (no server): a folder with gabarito.json."""
+    if not MOBILE_DIR.exists():
+        return []
+    return sorted((f for f in MOBILE_DIR.iterdir() if f.is_dir() and (f / "gabarito.json").is_file()),
+                  key=lambda f: f.name)
+
+
 def vuln_count(folder):
     gab = folder / "gabarito.json"
     if not gab.is_file():
@@ -143,6 +156,16 @@ def refresh_inventory():
                 LABS[folder.name].update(index=index, folder=folder,
                                          command=resolve_command(folder),
                                          target_port=target_port)
+        # Mobile labs: static APK trees, never booted (no command / no port).
+        for folder in discover_mobile():
+            live.add(folder.name)
+            if folder.name not in LABS:
+                LABS[folder.name] = {"index": 900 + len(LABS), "folder": folder,
+                                     "command": None, "target_port": None,
+                                     "process": None, "static": True,
+                                     "log_file": LOG_DIR / f"{folder.name}.log"}
+            else:
+                LABS[folder.name].update(folder=folder, static=True)
 
 
 def is_alive(lab):
@@ -176,6 +199,8 @@ def detect_port(lab):
 
 
 def start_lab(lab, timeout=5.0):
+    if lab.get("static"):
+        return  # mobile labs are static artifacts, nothing to boot
     with _LOCK:
         if is_alive(lab):
             return
@@ -203,6 +228,8 @@ def start_lab(lab, timeout=5.0):
 
 
 def stop_lab(lab):
+    if lab.get("static"):
+        return
     proc = lab.get("process")
     if not proc or proc.poll() is not None:
         return
@@ -229,11 +256,14 @@ def serialize():
     out = []
     with _LOCK:
         for lab in sorted(LABS.values(), key=lambda x: x["index"]):
+            static = lab.get("static", False)
             alive = is_alive(lab)
-            port = detect_port(lab) if alive else None
+            port = detect_port(lab) if (alive and not static) else None
+            status = "STATIC" if static else ("UP" if alive else "DOWN")
             out.append({"id": lab["folder"].name, "lab": lab["index"], "folder": lab["folder"].name,
-                        "status": "UP" if alive else "DOWN", "port": port or "N/A",
+                        "status": status, "port": port or "N/A",
                         "url": f"http://{port}" if port else None,
+                        "static": static,
                         "vulns": vuln_count(lab["folder"]),
                         "description": LAB_METADATA.get(lab["folder"].name, "—")})
     return out
@@ -278,6 +308,7 @@ a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}
 .lt{margin:0;font-size:16px}.ln{margin:3px 0 0;color:var(--muted);font-size:12px}
 .chip{border-radius:999px;padding:4px 9px;font-weight:800;font-size:11px;letter-spacing:.08em;margin-left:6px}
 .chip.up{color:var(--green);border:1px solid rgba(0,255,136,.45)}.chip.down{color:var(--red);border:1px solid rgba(255,59,92,.45)}
+.chip.static{color:var(--cyan);border:1px solid rgba(0,229,255,.45)}
 .chip.v{color:var(--yellow);border:1px solid rgba(255,209,102,.45)}
 .target{border:1px dashed rgba(0,229,255,.32);border-radius:12px;padding:10px;background:rgba(0,229,255,.05);margin-bottom:10px;font-size:13px}
 .target strong{display:block;margin-top:5px;color:var(--cyan);font-size:14px}
@@ -304,21 +335,26 @@ async function one(id,a){await api("/api/labs/"+encodeURIComponent(id)+"/"+a,"PO
 function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
 function card(l){const c=el("article","card");const top=el("div","top");const w=el("div");
 w.appendChild(el("h3","lt","LAB "+l.lab));w.appendChild(el("p","ln",l.folder));
-const b=el("div");const v=el("span","chip v",l.vulns+" vulns");const s=el("span","chip "+(l.status==="UP"?"up":"down"),l.status);
+const chipCls=l.static?"static":(l.status==="UP"?"up":"down");
+const b=el("div");const v=el("span","chip v",l.vulns+" vulns");const s=el("span","chip "+chipCls,l.status);
 b.appendChild(v);b.appendChild(s);top.appendChild(w);top.appendChild(b);
-const tg=el("div","target","Target");const st=el("strong");
-if(l.url){const a=el("a",null,l.port);a.href=l.url;a.target="_blank";st.appendChild(a)}else st.textContent="N/A";
+const tg=el("div","target",l.static?"Artefato":"Target");const st=el("strong");
+if(l.static)st.textContent="APK estático — jadx/apktool";
+else if(l.url){const a=el("a",null,l.port);a.href=l.url;a.target="_blank";st.appendChild(a)}
+else st.textContent="N/A";
 tg.appendChild(st);const sf=el("div","surface");sf.innerHTML="<strong>Surface:</strong> ";sf.appendChild(document.createTextNode(l.description));
-const ac=el("div","acts");const bs=el("button","btn small green","Start");bs.onclick=()=>one(l.id,"start");
+const ac=el("div","acts");
+if(l.static){const bl=el("button","btn small","Logs");bl.onclick=()=>window.open("/logs/"+encodeURIComponent(l.id),"_blank");ac.appendChild(bl);}
+else{const bs=el("button","btn small green","Start");bs.onclick=()=>one(l.id,"start");
 const bt=el("button","btn small red","Stop");bt.onclick=()=>one(l.id,"stop");
 const bl=el("button","btn small","Logs");bl.onclick=()=>window.open("/logs/"+encodeURIComponent(l.id),"_blank");
 ac.appendChild(bs);ac.appendChild(bt);ac.appendChild(bl);
-if(l.url){const bo=el("button","btn small","Open");bo.onclick=()=>window.open(l.url,"_blank");ac.appendChild(bo)}
+if(l.url){const bo=el("button","btn small","Open");bo.onclick=()=>window.open(l.url,"_blank");ac.appendChild(bo)}}
 c.appendChild(top);c.appendChild(tg);c.appendChild(sf);c.appendChild(ac);return c}
 async function load(){const d=await api("/api/labs");const labs=d.labs;
 document.getElementById("t").textContent=labs.length;
 document.getElementById("u").textContent=labs.filter(x=>x.status==="UP").length;
-document.getElementById("d").textContent=labs.filter(x=>x.status!=="UP").length;
+document.getElementById("d").textContent=labs.filter(x=>x.status==="DOWN").length;
 document.getElementById("v").textContent=labs.reduce((a,x)=>a+(+x.vulns||0),0);
 const root=document.getElementById("cards");root.innerHTML="";labs.forEach(l=>root.appendChild(card(l)))}
 load();setInterval(load,3000);
@@ -406,12 +442,33 @@ class Handler(BaseHTTPRequestHandler):
         return self._text(404, "not found", "text/plain")
 
 
+def run_lock(action):
+    """Trava/destrava os gabaritos via benchmark-lock.sh (fonte única da lógica).
+
+    lock roda ao subir o console; unlock roda só no CTRL+C — o operador, não o
+    agente, controla o cadeado. Em Windows exige bash (WSL/Git-Bash).
+    """
+    script = ROOT_DIR / "benchmark-lock.sh"
+    if not script.is_file():
+        return
+    if IS_WIN and not os.environ.get("SHELL"):
+        print(f"[!] auto-{action} precisa de bash; trave/destrave manualmente (ver README).")
+        return
+    try:
+        subprocess.run(["bash", str(script), action], cwd=str(ROOT_DIR),
+                       env={**os.environ, "HACKERDUMMY_ROOT": str(ROOT_DIR)}, check=False)
+    except Exception as exc:
+        print(f"[!] benchmark-lock {action} falhou: {exc}")
+
+
 def main():
     ap = argparse.ArgumentParser(description="HackerDummy CTF web console (stdlib).")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8088)
     args = ap.parse_args()
     LOG_DIR.mkdir(exist_ok=True)
+    print("[*] Travando gabaritos p/ pentest às cegas (lock)...")
+    run_lock("lock")
     refresh_inventory()
     labs = serialize()
     total_vulns = sum(l["vulns"] for l in labs)
@@ -419,6 +476,8 @@ def main():
     def shutdown(*_):
         print("\n[!] Encerrando — derrubando labs...")
         stop_all()
+        print("[!] Destravando gabaritos (unlock)...")
+        run_lock("unlock")
         print("[+] Todos os labs finalizados.")
         sys.exit(0)
 
