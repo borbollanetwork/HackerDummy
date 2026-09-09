@@ -13,7 +13,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/web%20labs-20-00e5ff">
   <img src="https://img.shields.io/badge/planted%20vulns-134-ffd166">
-  <img src="https://img.shields.io/badge/mobile%20labs-Android%20track-7b1fa2">
+  <img src="https://img.shields.io/badge/mobile%20labs-2%20live%20%C2%B7%206%20planned-7b1fa2">
   <img src="https://img.shields.io/badge/dependencies-zero%20(stdlib)-00ff88">
   <img src="https://img.shields.io/badge/provider-agnostic-2563eb">
   <img src="https://img.shields.io/badge/use-authorized%20only-ff3b5c">
@@ -95,6 +95,47 @@ python ctf_platform.py                    # -> http://127.0.0.1:8088
 Both are **cross-platform** (Windows / Linux / macOS) and **stdlib-only** — no
 Flask, no pip install. The web console shows each lab as a card with its live
 status, target port, planted-vuln count, and attack surface — **one port, one lab.**
+
+The **mobile labs** also appear in both runners, tagged **STATIC** (there is no
+server to boot): the terminal table lists them with a `jadx/apktool` marker, and
+the web console renders them as STATIC cards (planted-vuln count + surface, no
+start/stop). Analyze them offline — see [the mobile track](#the-mobile-labs-android--new-track).
+
+## Hands-off: run the whole benchmark with one prompt
+
+Don't want to drive each lab by hand? [`bench-prompt.txt`](bench-prompt.txt) is a
+ready-made, provider-agnostic prompt that makes an agent pentest **every** lab
+blind, write its findings, then compare against the answer keys and score itself —
+web labs *and* the static mobile labs, in one run.
+
+```bash
+# 1. boot the targets — this AUTO-LOCKS the answer keys (leave it running)
+python run_labs.py                # or: python ctf_platform.py  -> http://127.0.0.1:8088
+
+# 2. copy the ENTIRE contents of bench-prompt.txt into your AI agent and let it run.
+#    It enumerates, exploits, and saves findings to a `benchmark/` workspace — blind.
+
+# 3. when the agent says it finished the pentest and froze findings.json,
+#    press CTRL+C in the runner. That UNLOCKS the keys; the agent then self-scores.
+```
+
+> **The lock is mandatory and automatic — the operator holds the key, never the
+> agent.** A blind benchmark is only valid if the agent never saw the answer key.
+> **Starting the runner** moves every `gabarito.json` and `RESULTS.md` out of the
+> tree into a vault, so the files literally do not exist on disk while the agent
+> pentests — it cannot read, list, or grep them, and it never runs lock/unlock
+> itself. **Pressing CTRL+C** in the runner restores the keys and verifies their
+> hashes (failing loudly on tampering) — do this only once the agent has frozen its
+> findings and is ready to score. Scoring only reads the key files, so the labs
+> being down at that point is fine. Check state anytime with
+> `./benchmark-lock.sh status` (Windows: run the runner under WSL/Git-Bash, since
+> the lock needs `bash`).
+
+That's the whole flow: **start the runner (auto-locks) → paste the prompt → CTRL+C
+to unlock and score.** The prompt has two parts — **Prompt 1** does the blind
+pentest and scoring; **Prompt 2** is an optional *learning loop* that turns the
+misses into reusable knowledge so the next round scores higher. Everything the
+agent produces lands in the `benchmark/` workspace it creates.
 
 ## The findings format
 
@@ -183,6 +224,19 @@ mobile-banking target (RASP, native pinning, anti-instrumentation, obfuscation):
 > Decompile/build tooling: [`jadx`](https://github.com/skylot/jadx) +
 > [`apktool`](https://apktool.org). See [`labs/mobile/MOBILE.md`](labs/mobile/MOBILE.md).
 
+Scoring is identical to the web labs — point your agent at the decompiled tree
+**blind**, collect its findings, and diff against the key:
+
+```bash
+# 1. analyze the app statically (no server); output findings as JSON
+#    target: labs/mobile/M01-leakyvault/app  (AndroidManifest.xml, smali/, res/, assets/)
+
+# 2. score against the answer key
+python harness/score_lab.py \
+  --gabarito labs/mobile/M01-leakyvault/gabarito.json \
+  --findings your_agent_findings.json
+```
+
 ## Canonical taxonomy
 
 The class keys HackerDummy scores against live in
@@ -251,6 +305,8 @@ harness/
   classify.py            # standalone canonical taxonomy (free text -> class key)
 run_labs.py              # boot every HTTP lab; live status table (cross-platform)
 ctf_platform.py          # local web console to start/stop labs (stdlib, cross-platform)
+bench-prompt.txt         # hands-off prompt: agent pentests all labs blind, then self-scores
+benchmark-lock.sh        # lock/unlock the answer keys during a blind run (integrity vault)
 examples/                # example findings files
 assets/                  # logo / brand
 TAXONOMY.md              # the canonical vulnerability class keys
