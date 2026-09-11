@@ -1,58 +1,59 @@
 # TrustEdge
 
-> **INTENTIONALLY VULNERABLE - localhost only.** TrustEdge is a deliberately
-> broken training app. Every bug is exploitable by design. Bind is fixed to
-> `127.0.0.1:18808`. Never expose it to a network, never run it on a machine
-> you care about, and never reuse any of its code.
+> **VULNERÁVEL DE PROPÓSITO - somente localhost.** O TrustEdge é uma aplicação
+> de treino quebrada de propósito. Todo bug é explorável por projeto. O bind é
+> fixo em `127.0.0.1:18808`. Nunca a exponha a uma rede, nunca a rode numa
+> máquina de que você goste, e nunca reaproveite nenhum dos seus códigos.
 
-TrustEdge is a tiny "account portal" written as a **single stdlib-only Python
-file** (`http.server`, no dependencies). Its entire theme is **trusting
-attacker-controlled request headers and parameters**: CORS `Origin` reflection,
-`Host` / `X-Forwarded-Host` header injection, CRLF / HTTP response splitting,
-and an unkeyed-header web-cache-poisoning primitive.
+O TrustEdge é um pequeno "portal de conta" escrito como um **arquivo Python
+único, só com a biblioteca padrão** (`http.server`, sem dependências). Todo o
+tema dele é **confiar em cabeçalhos e parâmetros de requisição controlados pelo
+atacante**: reflexão do `Origin` de CORS, injeção do cabeçalho `Host` /
+`X-Forwarded-Host`, CRLF / divisão de resposta HTTP e uma primitiva de
+envenenamento de cache web por cabeçalho fora da chave.
 
-The app fakes a logged-in user (`victim`) - it assumes a session cookie is
-present and does **no real authentication**. That is intentional: the point of
-the lab is the trust-boundary bugs, not the login.
+A aplicação finge um usuário logado (`victim`) - assume que há um cookie de
+sessão presente e **não faz autenticação real**. Isso é intencional: o ponto do
+laboratório são os bugs de fronteira de confiança, não o login.
 
-## Run
+## Rodar
 
 ```bash
 python app.py
-# -> TrustEdge listening on http://127.0.0.1:18808/  (GET /)
+# -> TrustEdge escutando em http://127.0.0.1:18808/  (GET /)
 ```
 
-Then browse / curl `http://127.0.0.1:18808`. The home page links to every
-endpoint (`/profile`, `/api/account`, `/api/data`, `/reset`, `/redirect`) so the
-attack surface is discoverable.
+Depois navegue / faça curl em `http://127.0.0.1:18808`. A página inicial aponta
+para todo endpoint (`/profile`, `/api/account`, `/api/data`, `/reset`,
+`/redirect`), então a superfície de ataque é descobrível.
 
-## Planted vulnerabilities (T1..T7)
+## Vulnerabilidades plantadas (T1..T7)
 
-| ID | Name | Route | Trusted input | Confirm with curl | Impact |
-|----|------|-------|---------------|-------------------|--------|
-| **T1** | CORS reflects Origin + credentials | `GET /api/account` | `Origin` header (reflected verbatim) | `curl -s -i -H 'Origin: https://evil.example' http://127.0.0.1:18808/api/account` -> `Access-Control-Allow-Origin: https://evil.example` **+** `Access-Control-Allow-Credentials: true` | Any website can read the victim's authenticated account JSON (api key, ssn, balance) cross-origin with the victim's cookies. |
-| **T2** | CORS allows `null` origin | `GET /api/data` | `Origin` header (incl. `null`) | `curl -s -i -H 'Origin: null' http://127.0.0.1:18808/api/data` -> `Access-Control-Allow-Origin: null` **+** credentials | `Origin: null` (sandboxed iframe, `data:`/`file:` document) bypasses origin checks and reads authenticated business data. Other origins are reflected too. |
-| **T3** | Host header injection in password reset | `POST /reset` | `Host` header | `curl -s -H 'Host: evil.example' -d 'user=victim' http://127.0.0.1:18808/reset` -> `"link":"http://evil.example/reset-confirm?token=..."` | Attacker poisons the reset link sent to the victim; victim clicks, token leaks to attacker host -> **account takeover**. |
-| **T4** | `X-Forwarded-Host` trusted for absolute URLs | `GET /`, `GET /profile` | `X-Forwarded-Host` header (else `Host`) | `curl -s -H 'X-Forwarded-Host: evil.example' http://127.0.0.1:18808/` -> `<link rel="canonical" href="http://evil.example/">` and asset/home links point at evil.example | Canonical/absolute links (SEO, asset loads, password-reset-style flows) are redirected to an attacker domain. |
-| **T5** | CRLF injection / HTTP response splitting | `GET /redirect?next=` | `next` param (CR/LF not stripped) | `curl -s -i 'http://127.0.0.1:18808/redirect?next=/x%0d%0aSet-Cookie:admin=1'` -> response contains injected `Set-Cookie: admin=1` header | Inject arbitrary response headers (`Set-Cookie`, cache directives) / split the response -> session fixation, XSS via injected body, cache poisoning. |
-| **T6** | Web cache poisoning via unkeyed header | `GET /` | `X-Forwarded-Host` (unkeyed) reflected into a **cacheable** body | `curl -s -i -H 'X-Forwarded-Host: evil.example' http://127.0.0.1:18808/` -> `evil.example` in the HTML body **+** `Cache-Control: public, max-age=300` | Response is cacheable and reflects an attacker-controlled, unkeyed header into `<link canonical>` / `<script src>`; a poisoned cache entry serves the attacker's host/asset to **all** users. |
-| **T7** | Missing security headers | every response | n/a (omission) | `curl -s -I http://127.0.0.1:18808/` -> no `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security` | No defense-in-depth: clickjacking, MIME sniffing, downgrade, and reflected-content attacks are unmitigated. |
+| ID | Nome | Rota | Entrada confiada | Confirmar com curl | Impacto |
+|----|------|------|------------------|--------------------|--------|
+| **T1** | CORS reflete o Origin + credenciais | `GET /api/account` | Cabeçalho `Origin` (refletido literalmente) | `curl -s -i -H 'Origin: https://evil.example' http://127.0.0.1:18808/api/account` -> `Access-Control-Allow-Origin: https://evil.example` **+** `Access-Control-Allow-Credentials: true` | Qualquer site lê o JSON de conta autenticado da vítima (chave de API, ssn, saldo) entre origens, com os cookies da vítima. |
+| **T2** | CORS permite a origem `null` | `GET /api/data` | Cabeçalho `Origin` (inclusive `null`) | `curl -s -i -H 'Origin: null' http://127.0.0.1:18808/api/data` -> `Access-Control-Allow-Origin: null` **+** credenciais | `Origin: null` (iframe em sandbox, documento `data:`/`file:`) contorna a verificação de origem e lê dados de negócio autenticados. Outras origens também são refletidas. |
+| **T3** | Injeção de cabeçalho Host na redefinição de senha | `POST /reset` | Cabeçalho `Host` | `curl -s -H 'Host: evil.example' -d 'user=victim' http://127.0.0.1:18808/reset` -> `"link":"http://evil.example/reset-confirm?token=..."` | O atacante envenena o link de redefinição enviado à vítima; a vítima clica, o token vaza para o host do atacante -> **tomada de conta**. |
+| **T4** | `X-Forwarded-Host` confiado para URLs absolutas | `GET /`, `GET /profile` | Cabeçalho `X-Forwarded-Host` (senão `Host`) | `curl -s -H 'X-Forwarded-Host: evil.example' http://127.0.0.1:18808/` -> `<link rel="canonical" href="http://evil.example/">` e os links de asset/início apontam para evil.example | Links canônicos/absolutos (SEO, carregamento de assets, fluxos estilo redefinição de senha) são redirecionados para um domínio do atacante. |
+| **T5** | Injeção de CRLF / divisão de resposta HTTP | `GET /redirect?next=` | Parâmetro `next` (CR/LF não removidos) | `curl -s -i 'http://127.0.0.1:18808/redirect?next=/x%0d%0aSet-Cookie:admin=1'` -> a resposta contém o cabeçalho injetado `Set-Cookie: admin=1` | Injete cabeçalhos de resposta arbitrários (`Set-Cookie`, diretivas de cache) / divida a resposta -> fixação de sessão, XSS pelo corpo injetado, envenenamento de cache. |
+| **T6** | Envenenamento de cache web por cabeçalho fora da chave | `GET /` | `X-Forwarded-Host` (fora da chave) refletido num corpo **cacheável** | `curl -s -i -H 'X-Forwarded-Host: evil.example' http://127.0.0.1:18808/` -> `evil.example` no corpo HTML **+** `Cache-Control: public, max-age=300` | A resposta é cacheável e reflete um cabeçalho fora da chave, controlado pelo atacante, em `<link canonical>` / `<script src>`; uma entrada de cache envenenada serve o host/asset do atacante a **todos** os usuários. |
+| **T7** | Cabeçalhos de segurança ausentes | toda resposta | n/a (omissão) | `curl -s -I http://127.0.0.1:18808/` -> sem `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security` | Sem defesa em profundidade: clickjacking, MIME sniffing, downgrade e ataques de conteúdo refletido ficam sem mitigação. |
 
-### Notes on confirming T5
+### Notas sobre confirmar o T5
 
-`http.client` / `BaseHTTPRequestHandler.send_header` may reject or strip CR/LF.
-The `/redirect` handler therefore writes the status line and headers **by hand**
-to the socket, so an injected CRLF in `next` genuinely splits the response. In
-the raw output you will see the attacker's `Set-Cookie: admin=1` as a real
-header line, not as part of the `Location` value.
+O `http.client` / `BaseHTTPRequestHandler.send_header` pode rejeitar ou remover
+CR/LF. Por isso o handler de `/redirect` escreve a linha de status e os
+cabeçalhos **na mão** no socket, então um CRLF injetado em `next` divide de fato
+a resposta. Na saída bruta você verá o `Set-Cookie: admin=1` do atacante como uma
+linha de cabeçalho real, não como parte do valor do `Location`.
 
 ## Endpoints
 
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `/` | GET | Home page; reflects `X-Forwarded-Host`, cacheable (T4, T6, T7). |
-| `/profile` | GET | Profile page; absolute links from `X-Forwarded-Host` (T4). |
-| `/api/account` | GET | Account JSON; reflective CORS + credentials (T1). |
-| `/api/data` | GET | Business JSON; reflective CORS incl. `null` (T2). |
-| `/reset` | GET/POST | Password reset; link built from `Host` header (T3). |
-| `/redirect` | GET | `next=` redirector with CRLF injection (T5). |
+| Rota | Método | Propósito |
+|------|--------|-----------|
+| `/` | GET | Página inicial; reflete `X-Forwarded-Host`, cacheável (T4, T6, T7). |
+| `/profile` | GET | Página de perfil; links absolutos de `X-Forwarded-Host` (T4). |
+| `/api/account` | GET | JSON de conta; CORS reflexivo + credenciais (T1). |
+| `/api/data` | GET | JSON de negócio; CORS reflexivo inclusive `null` (T2). |
+| `/reset` | GET/POST | Redefinição de senha; link montado a partir do cabeçalho `Host` (T3). |
+| `/redirect` | GET | Redirecionador `next=` com injeção de CRLF (T5). |

@@ -1,50 +1,53 @@
 # M01 — LeakyVault (Android)
 
-The **floor** of the mobile ladder: a wide-open Android app with no obfuscation
-and no runtime protections. Pure static-analysis fruit — the findings a mobile
-pentester reads straight off the decompiled manifest, resources, and dex.
+O **piso** da escada móvel: um aplicativo Android escancarado, sem ofuscação e
+sem proteções em tempo de execução. Fruta pura de análise estática — os achados
+que um pentester móvel lê direto do manifesto, dos recursos e do dex
+decompilados.
 
-## Artifact
+## Artefato
 
-A decompiled **apktool tree** at [`app/`](app/) — analyze it the way the
-`droidagent-mobile` static phase does (manifest flags, secret grep, component
-export review). See [`../MOBILE.md`](../MOBILE.md) for the format.
+Uma **árvore do apktool** decompilada em [`app/`](app/) — analise-a do jeito que
+a fase estática do `droidagent-mobile` faz (flags do manifesto, grep de segredos,
+revisão de exportação de componentes). Veja [`../MOBILE.md`](../MOBILE.md) para o
+formato.
 
 ```
 app/
-  AndroidManifest.xml                  # debuggable, allowBackup, exported comps, cleartext
+  AndroidManifest.xml                  # debuggable, allowBackup, componentes exportados, cleartext
   apktool.yml
-  res/values/strings.xml               # hardcoded API key + HMAC secret
-  res/xml/network_security_config.xml  # cleartextTrafficPermitted + user trust-anchors
-  assets/config.json                   # base_url over http:// + the same secrets
-  smali/com/leakyvault/app/ApiClient.smali   # secrets compiled into the dex; logs the token
+  res/values/strings.xml               # chave de API + segredo HMAC embutidos no código
+  res/xml/network_security_config.xml  # cleartextTrafficPermitted + trust-anchors do usuário
+  assets/config.json                   # base_url sobre http:// + os mesmos segredos
+  smali/com/leakyvault/app/ApiClient.smali   # segredos compilados no dex; loga o token
 ```
 
-> Intentionally vulnerable, training only. No real backend; every secret-shaped
-> string (`lv_live_…`, `lv_sign_…`) is a non-functional placeholder.
+> Vulnerável de propósito, só para treino. Sem backend real; toda string com cara
+> de segredo (`lv_live_…`, `lv_sign_…`) é um marcador sem função.
 
-## Planted vulnerabilities (5)
+## Vulnerabilidades plantadas (5)
 
-| id | class | severity | evidence |
-|----|-------|:--------:|----------|
-| L1 | `debuggable` | medium | `android:debuggable="true"` in the manifest |
-| L2 | `backup-allowed` | medium | `android:allowBackup="true"` → `adb backup` data theft |
-| L3 | `exported-component` | high | `AdminActivity` / `SyncReceiver` / `NotesProvider` exported, no permission |
-| L4 | `cleartext-traffic` | high | `usesCleartextTraffic="true"` + `network_security_config` permits cleartext & user CAs |
-| L5 | `creds` | high | hardcoded API key + HMAC secret in `strings.xml`, `assets/config.json`, and the dex |
+| id | classe | severidade | evidência |
+|----|--------|:----------:|-----------|
+| L1 | `debuggable` | medium | `android:debuggable="true"` no manifesto |
+| L2 | `backup-allowed` | medium | `android:allowBackup="true"` → roubo de dados por `adb backup` |
+| L3 | `exported-component` | high | `AdminActivity` / `SyncReceiver` / `NotesProvider` exportados, sem permissão |
+| L4 | `cleartext-traffic` | high | `usesCleartextTraffic="true"` + `network_security_config` permite cleartext e ACs do usuário |
+| L5 | `creds` | high | chave de API + segredo HMAC embutidos em `strings.xml`, `assets/config.json` e no dex |
 
-Full details and exploit notes in [`gabarito.json`](gabarito.json).
+Detalhes completos e notas de exploração em [`gabarito.json`](gabarito.json).
 
-## Analyze & score
+## Analisar e pontuar
 
 ```bash
-# point your mobile static-analysis agent at app/ (BLIND — don't show it the gabarito),
-# collect findings as JSON, then:
+# aponte o seu agente de análise estática móvel para app/ (ÀS CEGAS — não mostre o gabarito),
+# recolha os achados em JSON, depois:
 python harness/score_lab.py \
   --gabarito labs/mobile/M01-leakyvault/gabarito.json \
-  --findings your_agent_findings.json
+  --findings achados_do_seu_agente.json
 ```
 
-Matching is by **class** (location is `*` / app-wide here). A real APK can be
-produced with `apktool b labs/mobile/M01-leakyvault/app` once the resource set is
-completed; static analysis needs only the tree as shipped.
+O casamento é por **classe** (a localização é `*` / de toda a aplicação aqui). Um
+APK real pode ser produzido com `apktool b labs/mobile/M01-leakyvault/app` quando
+o conjunto de recursos estiver completo; a análise estática precisa apenas da
+árvore como entregue.
