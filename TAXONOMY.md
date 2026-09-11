@@ -1,143 +1,149 @@
-# Canonical vulnerability taxonomy
+# Taxonomia canônica de vulnerabilidades
 
-These are the class keys HackerDummy scores against. Every `gabarito.json` uses
-them, and [`harness/classify.py`](harness/classify.py) maps free-text finding
-labels to them — so your agent can report findings in its own words and still be
-scored. Matching is by **class + route**.
+Estas são as chaves de classe contra as quais o HackerDummy pontua. Todo
+`gabarito.json` usa essas chaves, e o
+[`harness/classify.py`](harness/classify.py) mapeia rótulos de achados em texto
+livre para elas — assim o seu agente relata os achados com as próprias palavras
+e mesmo assim é pontuado. O casamento é por **classe + rota**.
 
-You can either emit a canonical `class` directly, or just give a `title` and let
-the harness classify it. When two classes could apply, the **more specific** one
-wins (e.g. `actuator` over `rce` for an exposed Jolokia/JMX; `default-creds` over
-`creds`; `stored-xss` over `xss`; `no-rate-limit` over `graphql` for batched
-brute force). Impact never overrides root cause: a file upload that yields a
-webshell is `upload`, not `rce`.
+Você pode emitir uma `class` canônica diretamente ou apenas informar um `title`
+e deixar o harness classificar. Quando duas classes se aplicam, vence a **mais
+específica** (por exemplo `actuator` em vez de `rce` para um Jolokia/JMX
+exposto; `default-creds` em vez de `creds`; `stored-xss` em vez de `xss`;
+`no-rate-limit` em vez de `graphql` para força bruta em lote). O impacto nunca
+sobrepõe a causa raiz: um envio de arquivo que resulta em webshell é `upload`,
+não `rce`.
 
-Titles are recognized in **English and Portuguese**, accented or not, so
-"Travessia de diretório permite ler /etc/passwd" scores the same as "Path
-traversal". Where the two languages collide, English precedence applies.
+Os títulos são reconhecidos em **português e inglês**, com ou sem acento, então
+"Travessia de diretório permite ler /etc/passwd" pontua igual a "Path
+traversal". Quando os dois idiomas colidem, vale a precedência do inglês.
 
-Print the live list of keys with `python harness/classify.py --list-classes`,
-or check one title with `python harness/classify.py --explain "<title>"`.
+Imprima a lista viva de chaves com `python harness/classify.py --list-classes`,
+ou confira um título com `python harness/classify.py --explain "<título>"`.
 
-### How a finding is matched
-A planted vuln counts as found when the **class** is equal and the **route**
-agrees. Routes are compared as whole path segments, so the finding must be at
-least as specific as the answer key: a finding on `/api/users/search` matches a
-planted `/api/users/search`, and `/uploads/shell.php` matches a planted
-`/uploads`, but a finding that names only `/api` does **not** match a planted
-`/api/users/search`. Full URLs, mount prefixes (`/api/v1/me` for a planted
-`/me`), concrete ids against placeholders (`/api/user/1` for `/api/user/<id>`),
-and `host:port` keys matched by port all work. `route` `*`, `/` or `""` in a
-gabarito is host-level and matches any finding of that class.
+### Como um achado é casado
+Uma vulnerabilidade plantada conta como encontrada quando a **classe** é igual e
+a **rota** concorda. As rotas são comparadas por segmentos inteiros de caminho,
+então o achado precisa ser pelo menos tão específico quanto o gabarito: um
+achado em `/api/users/search` casa com uma plantada em `/api/users/search`, e
+`/uploads/shell.php` casa com uma plantada em `/uploads`, mas um achado que cita
+apenas `/api` **não** casa com uma plantada em `/api/users/search`. Funcionam
+também URLs completas, prefixos de montagem (`/api/v1/me` para uma plantada em
+`/me`), identificadores concretos contra marcadores (`/api/user/1` para
+`/api/user/<id>`) e chaves no formato `host:porta`, casadas pela porta. No
+gabarito, `route` igual a `*`, `/` ou `""` é de nível de host e casa com
+qualquer achado daquela classe.
 
-Each finding is credited to **at most one** planted vuln, and each planted vuln
-to at most one finding, so a single broad finding cannot mark several planted
-vulns as found.
+Cada achado é creditado a **no máximo uma** vulnerabilidade plantada, e cada
+plantada a no máximo um achado, então um único achado abrangente não marca
+várias plantadas como encontradas.
 
-## Injection & code execution
-| key | meaning |
-|-----|---------|
-| `nosqli` | NoSQL injection (Mongo query operators in user input) |
-| `ldap-injection` | LDAP filter injection |
-| `xpath-injection` | XPath query injection |
-| `ssi-injection` | Server-side / edge-side include injection (`.shtml`) |
-| `csv-injection` | Formula injection in exported CSV/spreadsheet |
-| `sqli` | SQL injection (error/boolean/union/auth-bypass) |
-| `rce` | Remote code execution / OS command injection |
-| `ssti` | Server-side template / expression-language injection |
-| `xxe` | XML external entity (file read / SSRF) |
-| `deserialization` | Insecure deserialization (pickle/unserialize/marshal → gadget) |
-| `lfi` | Local file inclusion / path traversal |
-| `upload` | Unrestricted file upload (webshell) |
-| `ssrf` | Server-side request forgery |
+## Injeção e execução de código
+| chave | significado |
+|-------|-------------|
+| `nosqli` | Injeção de NoSQL (operadores de consulta do Mongo na entrada do usuário) |
+| `ldap-injection` | Injeção em filtro LDAP |
+| `xpath-injection` | Injeção em consulta XPath |
+| `ssi-injection` | Injeção de server-side / edge-side include (`.shtml`) |
+| `csv-injection` | Injeção de fórmula em CSV ou planilha exportada |
+| `sqli` | Injeção de SQL (por erro, booleana, union, desvio de autenticação) |
+| `rce` | Execução remota de código / injeção de comando do sistema |
+| `ssti` | Injeção de template ou de linguagem de expressão no servidor |
+| `xxe` | Entidade externa de XML (leitura de arquivo, SSRF) |
+| `deserialization` | Desserialização insegura (pickle, unserialize, marshal → gadget) |
+| `lfi` | Inclusão de arquivo local / travessia de diretório |
+| `upload` | Envio irrestrito de arquivos (webshell) |
+| `ssrf` | Falsificação de requisição no lado do servidor |
 
-## Cross-site & client-trust
-| key | meaning |
-|-----|---------|
-| `xss` | Cross-site scripting (reflected / DOM-based) |
-| `stored-xss` | Stored/persistent XSS |
-| `prototype-pollution` | Client-side prototype pollution (`__proto__` via merge/clone) |
-| `race-condition` | TOCTOU / concurrency flaw (double-spend, limit bypass via parallel requests) |
-| `open-redirect` | Unvalidated redirect |
-| `clickjacking` | Missing frame protection (X-Frame-Options / frame-ancestors) |
-| `csrf` | Cross-Site Request Forgery (missing anti-CSRF token / unvalidated OAuth `state`) |
-| `smuggling` | HTTP request smuggling (CL.TE / TE.CL front-end/back-end desync) |
-| `cors-misconfig` | Permissive CORS (reflected/`null`/wildcard origin + credentials) |
-| `host-header-injection` | Host / X-Forwarded-Host trusted into links/redirects (reset poisoning) |
-| `crlf` | CRLF injection / HTTP response splitting |
-| `cache-poisoning` | Web cache poisoning via unkeyed header |
+## Cross-site e confiança no cliente
+| chave | significado |
+|-------|-------------|
+| `xss` | Cross-site scripting (refletido ou baseado em DOM) |
+| `stored-xss` | XSS armazenado ou persistente |
+| `prototype-pollution` | Poluição de protótipo no cliente (`__proto__` via merge ou clone) |
+| `race-condition` | TOCTOU / falha de concorrência (gasto duplo, desvio de limite por requisições paralelas) |
+| `open-redirect` | Redirecionamento sem validação |
+| `clickjacking` | Falta de proteção contra enquadramento (X-Frame-Options / frame-ancestors) |
+| `csrf` | Falsificação de requisição entre sites (sem token anti-CSRF, `state` de OAuth não validado) |
+| `smuggling` | Contrabando de requisições HTTP (dessincronização CL.TE / TE.CL entre front-end e back-end) |
+| `cors-misconfig` | CORS permissivo (origem refletida, `null` ou curinga, com credenciais) |
+| `host-header-injection` | Host ou X-Forwarded-Host usado em links e redirecionamentos (envenenamento de redefinição) |
+| `crlf` | Injeção de CRLF / divisão de resposta HTTP |
+| `cache-poisoning` | Envenenamento de cache web por cabeçalho fora da chave |
 
-## Access control & authorization
-| key | meaning |
-|-----|---------|
-| `idor` | Broken object-level authorization (IDOR / BOLA) |
-| `bfla` | Broken function-level authorization (privileged function callable) |
-| `mass-assignment` | Unexpected privileged fields accepted (role/is_admin) |
-| `excessive-data` | API returns sensitive fields a client must not see |
-| `admin-panel` | Unprotected admin/management interface |
+## Controle de acesso e autorização
+| chave | significado |
+|-------|-------------|
+| `idor` | Autorização quebrada em nível de objeto (IDOR / BOLA) |
+| `bfla` | Autorização quebrada em nível de função (função privilegiada chamável) |
+| `mass-assignment` | Campos privilegiados inesperados aceitos (role, is_admin) |
+| `excessive-data` | API devolve campos sensíveis que o cliente não deveria ver |
+| `admin-panel` | Interface administrativa ou de gerenciamento desprotegida |
 
-## Authentication, sessions & secrets
-| key | meaning |
-|-----|---------|
-| `jwt` | JWT flaws (alg:none, weak secret, missing claim validation) |
-| `2fa-bypass` | OTP/MFA leaked, master-coded, or not enforced |
-| `user-enum` | Username/account enumeration (response discrepancy) |
-| `no-rate-limit` | Missing brute-force / rate limiting |
-| `auth` | Broken authentication / weak password recovery / account takeover |
-| `session` | Broken session mgmt (fixation, no-logout-invalidation, predictable token) |
-| `default-creds` | Default/unchanged credentials (admin/admin, no password) |
-| `weak-crypto` | Weak password storage / hashing (MD5/unsalted/plaintext) |
-| `creds` | Exposed credentials / secrets / `.env` in cleartext |
+## Autenticação, sessões e segredos
+| chave | significado |
+|-------|-------------|
+| `jwt` | Falhas de JWT (alg:none, segredo fraco, claim sem validação) |
+| `2fa-bypass` | OTP/MFA vazado, com código mestre ou não exigido |
+| `user-enum` | Enumeração de usuários ou contas (resposta discrepante) |
+| `no-rate-limit` | Falta de limite de tentativas ou de taxa |
+| `auth` | Autenticação quebrada / recuperação de senha fraca / tomada de conta |
+| `session` | Gestão de sessão quebrada (fixação, sem invalidação no logout, token previsível) |
+| `default-creds` | Credenciais padrão ou nunca trocadas (admin/admin, sem senha) |
+| `weak-crypto` | Armazenamento ou hash de senha fraco (MD5, sem sal, texto plano) |
+| `creds` | Credenciais, segredos ou `.env` expostos em texto claro |
 
-## Exposure, config & disclosure
-| key | meaning |
-|-----|---------|
-| `scm` | Exposed source-control repo (`.git`/`.svn`) |
-| `backup` | Exposed backup / DB dump file |
-| `dir-listing` | Directory listing enabled |
-| `web-config` | Exposed `web.config` / connection strings |
-| `phpinfo` | `phpinfo()` exposed |
-| `actuator` | Java/Spring management interface exposed (Actuator/Jolokia/H2/heapdump) |
-| `exposed-service` | Unauthenticated network service (DB/cache/API/Docker) |
-| `headers` | Missing security headers (CSP/HSTS/XCTO/…) |
-| `cookie` | Insecure cookie attributes (no HttpOnly/Secure/SameSite) |
+## Exposição, configuração e divulgação
+| chave | significado |
+|-------|-------------|
+| `scm` | Repositório de código-fonte exposto (`.git`/`.svn`) |
+| `backup` | Arquivo de backup ou dump de banco exposto |
+| `dir-listing` | Listagem de diretórios habilitada |
+| `web-config` | `web.config` ou connection string exposta |
+| `phpinfo` | `phpinfo()` exposto |
+| `actuator` | Interface de gerenciamento Java/Spring exposta (Actuator, Jolokia, H2, heapdump) |
+| `exposed-service` | Serviço de rede sem autenticação (banco, cache, API, Docker) |
+| `headers` | Cabeçalhos de segurança ausentes (CSP, HSTS, XCTO, …) |
+| `cookie` | Atributos de cookie inseguros (sem HttpOnly, Secure ou SameSite) |
 | `trace` | HTTP TRACE / cross-site tracing |
-| `eol` | End-of-life / unsupported software |
-| `version` | Software version disclosure / banner |
-| `info-disc` | Information disclosure (verbose errors, stack traces, field suggestions) |
+| `eol` | Software em fim de vida ou sem suporte |
+| `version` | Divulgação da versão do software ou banner |
+| `info-disc` | Divulgação de informação (erros verbosos, stack traces, sugestão de campos) |
 
-## API-specific
-| key | meaning |
-|-----|---------|
-| `graphql` | GraphQL introspection enabled / schema exposure |
-| `dos` | Uncontrolled resource consumption (query depth/complexity, amplification) |
+## Específicas de API
+| chave | significado |
+|-------|-------------|
+| `graphql` | Introspecção do GraphQL habilitada / exposição do schema |
+| `dos` | Consumo descontrolado de recursos (profundidade ou complexidade de consulta, amplificação) |
 
-## Mobile (Android)
-| key | meaning |
-|-----|---------|
-| `debuggable` | `android:debuggable="true"` shipped — JDWP debugger attach, read/modify memory |
-| `backup-allowed` | `android:allowBackup="true"` — private app data extractable via `adb backup` |
-| `exported-component` | Activity/Service/Receiver/Provider exported without permission (IPC abuse) |
-| `cleartext-traffic` | Cleartext HTTP permitted (`usesCleartextTraffic` / network-security-config) |
-| `insecure-storage` | Sensitive data at rest in cleartext (world-readable SharedPreferences, unencrypted SQLite/PII) |
-| `sensitive-log` | Sensitive data (token/PII/PAN) written to logcat (`Log.d`/`Log.v`) |
+## Móvel (Android)
+| chave | significado |
+|-------|-------------|
+| `debuggable` | `android:debuggable="true"` publicado — anexo de depurador JDWP, leitura e alteração de memória |
+| `backup-allowed` | `android:allowBackup="true"` — dados privados do app extraíveis via `adb backup` |
+| `exported-component` | Activity, Service, Receiver ou Provider exportado sem permissão (abuso de IPC) |
+| `cleartext-traffic` | HTTP em texto claro permitido (`usesCleartextTraffic` / network-security-config) |
+| `insecure-storage` | Dados sensíveis em repouso em texto claro (SharedPreferences legível por todos, SQLite ou PII sem criptografia) |
+| `sensitive-log` | Dados sensíveis (token, PII, PAN) gravados no logcat (`Log.d`/`Log.v`) |
 
-> `weak-crypto` also covers mobile crypto misuse (AES-ECB, static/zero IV, hardcoded
-> crypto key, unsalted MD5/SHA1).
+> `weak-crypto` também cobre o mau uso de criptografia no móvel (AES-ECB, IV
+> estático ou zerado, chave de criptografia embutida no código, MD5/SHA1 sem sal).
 >
-> Hardcoded mobile secrets (API keys, signing secrets in `strings.xml`/`smali`/assets)
-> map to `creds`; weak mobile crypto to `weak-crypto`; content-provider path traversal
-> to `lfi` — the same web classes apply.
+> Segredos móveis embutidos no código (chaves de API, segredos de assinatura em
+> `strings.xml`, `smali` ou assets) vão para `creds`; criptografia móvel fraca
+> para `weak-crypto`; travessia de caminho em content provider para `lfi` — valem
+> as mesmas classes da web.
 
-## Catch-all
-| key | meaning |
-|-----|---------|
-| `other` | Anything the classifier can't map (won't match a planted vuln) |
+## Classe de reserva
+| chave | significado |
+|-------|-------------|
+| `other` | Tudo que o classificador não consegue mapear (não casa com nenhuma plantada) |
 
-> Want to add a class? Add a `(regex, key)` row to the `TAXONOMY` list in
-> `harness/classify.py` (most specific first, English and Portuguese wording in
-> the same pattern) and use the key in a lab's `gabarito.json`. Every class in a
-> gabarito must be a key listed here: `score_lab.py` rejects an answer key that
-> uses an unknown one. Use `python harness/classify.py --all "<title>"` to see
-> every class a title matches, which is how to spot a pattern that steals
-> findings from a more specific class above it.
+> Quer acrescentar uma classe? Adicione uma linha `(regex, chave)` à lista
+> `TAXONOMY` em `harness/classify.py` (mais específica primeiro, com as formas em
+> português e em inglês no mesmo padrão) e use a chave no `gabarito.json` de um
+> laboratório. Toda classe de um gabarito precisa ser uma chave listada aqui: o
+> `score_lab.py` rejeita um gabarito que use uma chave desconhecida. Use `python
+> harness/classify.py --all "<título>"` para ver todas as classes que um título
+> casa, que é como se percebe um padrão roubando achados de uma classe mais
+> específica acima dele.
