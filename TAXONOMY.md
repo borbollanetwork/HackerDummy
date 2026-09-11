@@ -9,11 +9,39 @@ You can either emit a canonical `class` directly, or just give a `title` and let
 the harness classify it. When two classes could apply, the **more specific** one
 wins (e.g. `actuator` over `rce` for an exposed Jolokia/JMX; `default-creds` over
 `creds`; `stored-xss` over `xss`; `no-rate-limit` over `graphql` for batched
-brute force).
+brute force). Impact never overrides root cause: a file upload that yields a
+webshell is `upload`, not `rce`.
+
+Titles are recognized in **English and Portuguese**, accented or not, so
+"Travessia de diretório permite ler /etc/passwd" scores the same as "Path
+traversal". Where the two languages collide, English precedence applies.
+
+Print the live list of keys with `python harness/classify.py --list-classes`,
+or check one title with `python harness/classify.py --explain "<title>"`.
+
+### How a finding is matched
+A planted vuln counts as found when the **class** is equal and the **route**
+agrees. Routes are compared as whole path segments, so the finding must be at
+least as specific as the answer key: a finding on `/api/users/search` matches a
+planted `/api/users/search`, and `/uploads/shell.php` matches a planted
+`/uploads`, but a finding that names only `/api` does **not** match a planted
+`/api/users/search`. Full URLs, mount prefixes (`/api/v1/me` for a planted
+`/me`), concrete ids against placeholders (`/api/user/1` for `/api/user/<id>`),
+and `host:port` keys matched by port all work. `route` `*`, `/` or `""` in a
+gabarito is host-level and matches any finding of that class.
+
+Each finding is credited to **at most one** planted vuln, and each planted vuln
+to at most one finding, so a single broad finding cannot mark several planted
+vulns as found.
 
 ## Injection & code execution
 | key | meaning |
 |-----|---------|
+| `nosqli` | NoSQL injection (Mongo query operators in user input) |
+| `ldap-injection` | LDAP filter injection |
+| `xpath-injection` | XPath query injection |
+| `ssi-injection` | Server-side / edge-side include injection (`.shtml`) |
+| `csv-injection` | Formula injection in exported CSV/spreadsheet |
 | `sqli` | SQL injection (error/boolean/union/auth-bypass) |
 | `rce` | Remote code execution / OS command injection |
 | `ssti` | Server-side template / expression-language injection |
@@ -106,5 +134,10 @@ brute force).
 |-----|---------|
 | `other` | Anything the classifier can't map (won't match a planted vuln) |
 
-> Want to add a class? Add a `(regex, key)` row to `harness/classify.py` (most
-> specific first) and use the key in a lab's `gabarito.json`.
+> Want to add a class? Add a `(regex, key)` row to the `TAXONOMY` list in
+> `harness/classify.py` (most specific first, English and Portuguese wording in
+> the same pattern) and use the key in a lab's `gabarito.json`. Every class in a
+> gabarito must be a key listed here: `score_lab.py` rejects an answer key that
+> uses an unknown one. Use `python harness/classify.py --all "<title>"` to see
+> every class a title matches, which is how to spot a pattern that steals
+> findings from a more specific class above it.
