@@ -1,59 +1,64 @@
-# Lab 03 — RelayKit — Results
+# Lab 03 — RelayKit — Resultados
 
-Scoring the pipeline against RelayKit's 7 planted server-side vulns. The
-exploitation agent ran **blind** (recon endpoint list only, never the key).
+Pontuação da esteira contra as 7 vulnerabilidades de lado do servidor plantadas
+no RelayKit. O agente de exploração rodou **às cegas** (só a lista de endpoints do
+reconhecimento, nunca o gabarito).
 
-## Method
+## Método
 
-Recon: the upgraded `content_discovery.py` **source-mined** the endpoint list
-straight out of the JSON home page (none of RelayKit's routes are in any
-wordlist) — including the server-only `/internal/secrets`. Then a blind
-server-side agent tested SSRF (incl. filter bypass), XXE, insecure
-deserialization, OS command injection, path traversal, and SSTI, confirming each
-with live requests. `score_lab.py` matched by class + route.
+Reconhecimento: o `content_discovery.py` aprimorado **minerou do código-fonte** a
+lista de endpoints direto da página inicial em JSON (nenhuma das rotas do RelayKit
+está em wordlist) — inclusive o `/internal/secrets`, só de servidor. Depois um
+agente de lado do servidor às cegas testou SSRF (inclusive desvio de filtro), XXE,
+desserialização insegura, injeção de comando do sistema, travessia de caminho e
+SSTI, confirmando cada um com requisições ao vivo. O `score_lab.py` casou por
+classe + rota.
 
-## Score
+## Nota
 
-| Pass        | Recall        | Precision | Notes |
-|-------------|---------------|-----------|-------|
-| Baseline    | **4/7 (57%)** | 100%      | ssrf/rce/lfi classified; xxe/deser/ssti had no class |
-| After fix   | **7/7 (100%)**| 100%      | +3 server-side classes |
+| Passada     | Recall        | Precisão | Notas |
+|-------------|---------------|----------|-------|
+| Linha de base | **4/7 (57%)** | 100%    | ssrf/rce/lfi classificados; xxe/deser/ssti sem classe |
+| Após correção | **7/7 (100%)**| 100%    | +3 classes de lado do servidor |
 
-The agent confirmed all 7 on the first pass (bonus: noted `/fetch` also accepts
-`file://`, and that the `/preview` embedded-credential bypass is correctly
-blocked while case-variation works). The 3 misses were, again, **missing
-classes** — the engine could not name XXE, deserialization, or SSTI.
+O agente confirmou todos os 7 na primeira passada (bônus: notou que `/fetch`
+também aceita `file://`, e que o desvio por credencial embutida do `/preview` é
+corretamente bloqueado enquanto a variação de maiúsculas funciona). As 3 falhas
+foram, de novo, **classes ausentes** — o motor não sabia nomear XXE,
+desserialização ou SSTI.
 
-## The gap this lab exposed
+## A lacuna que este laboratório revelou
 
-`finding_model.py` had `ssrf`, `rce`, and `lfi` but no vocabulary for the other
-three core server-side classes. Added:
+O `finding_model.py` tinha `ssrf`, `rce` e `lfi`, mas nenhum vocabulário para as
+outras três classes centrais de lado do servidor. Adicionadas:
 
-| Class | CWE | Catches |
-|-------|-----|---------|
-| `xxe` | 611 | XML external entities → file read / SSRF |
-| `deserialization` | 502 | unsafe pickle/unserialize/yaml.load → RCE gadgets |
-| `ssti` | 1336 | server-side template / expression-language injection |
+| Classe | CWE | Pega |
+|--------|-----|------|
+| `xxe` | 611 | entidades externas de XML → leitura de arquivo / SSRF |
+| `deserialization` | 502 | pickle/unserialize/yaml.load inseguro → gadgets de RCE |
+| `ssti` | 1336 | injeção de template / linguagem de expressão no servidor |
 
-Each with CVSS + ≥3 remediation references (OWASP/PortSwigger/CWE). Re-score:
-**7/7, 100% precision**, and **no regression** (Lab 01 still 15/15, Lab 02 still
-12/12).
+Cada uma com CVSS + ≥3 referências de remediação (OWASP/PortSwigger/CWE).
+Repontuação: **7/7, 100% de precisão**, e **sem regressão** (Lab 01 ainda 15/15,
+Lab 02 ainda 12/12).
 
-## Recon win (the crawling upgrade)
+## Vitória no reconhecimento (o aprimoramento do crawling)
 
-This lab doubled as a test of the directory-crawling improvement. RelayKit's home
-is JSON, and its endpoints (`/fetch`, `/render`, `/internal/secrets`, …) appear
-in **no** wordlist. Before the upgrade, `content_discovery` found nothing; after
-adding **source-reference mining** (HTML + JS/JSON `fetch`/`axios`/XHR/path
-strings) and **redirect-following**, it surfaced the live endpoints — including
-the SSRF target `/internal/secrets` — directly from source. This is the
-"see 100% of the surface" rule in action: wordlist-only recon would have missed
-the entire application.
+Este laboratório serviu também de teste da melhoria de crawling de diretórios. A
+página inicial do RelayKit é JSON, e os endpoints dele (`/fetch`, `/render`,
+`/internal/secrets`, …) não aparecem em **nenhuma** wordlist. Antes do
+aprimoramento, o `content_discovery` não achava nada; depois de adicionar
+**mineração de referências no código-fonte** (strings de caminho em HTML +
+JS/JSON `fetch`/`axios`/XHR) e **seguir redirecionamentos**, ele levantou os
+endpoints ao vivo — inclusive o alvo do SSRF `/internal/secrets` — direto do
+código-fonte. É a regra "enxergar 100% da superfície" em ação: reconhecimento só
+por wordlist teria perdido a aplicação inteira.
 
-## Strong points confirmed
+## Pontos fortes confirmados
 
-- The blind agent's server-side tradecraft was complete and chained well (SSRF →
-  internal secrets, filter-bypass reasoning, XXE+LFI+file-SSRF all reaching the
-  same file, gadget-resolution proof for deserialization).
-- Safety-by-design held: command injection and deserialization were confirmed
-  without any real code execution on the host.
+- O ofício de lado do servidor do agente às cegas foi completo e encadeou bem
+  (SSRF → segredos internos, raciocínio de desvio de filtro, XXE+LFI+SSRF por
+  arquivo todos alcançando o mesmo arquivo, prova de resolução de gadget na
+  desserialização).
+- A segurança por projeto se manteve: injeção de comando e desserialização foram
+  confirmadas sem nenhuma execução real de código no host.

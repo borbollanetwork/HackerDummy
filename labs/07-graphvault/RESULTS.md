@@ -1,56 +1,57 @@
-# Lab 07 — GraphVault — Results
+# Lab 07 — GraphVault — Resultados
 
-Scoring the pipeline against a GraphQL API with 8 planted vulns. The agent ran
-**blind** — given only the `/graphql` endpoint (which recon source-mined from the
-JSON index), never the answer key.
+Pontuação da esteira contra uma API GraphQL com 8 vulnerabilidades plantadas. O
+agente rodou **às cegas** — recebeu apenas o endpoint `/graphql` (que o
+reconhecimento minerou do índice JSON), nunca o gabarito.
 
-## Score
+## Nota
 
-| Pass        | Recall        | Precision | Notes |
-|-------------|---------------|-----------|-------|
-| Baseline    | **6/8 (75%)** | 86%       | idor/excessive-data/bfla/no-rate-limit/sqli/info-disc classified |
-| After fix   | **8/8 (100%)**| 100%      | +2 classes (graphql, dos) |
+| Passada     | Recall        | Precisão | Notas |
+|-------------|---------------|----------|-------|
+| Linha de base | **6/8 (75%)** | 86%     | idor/excessive-data/bfla/no-rate-limit/sqli/info-disc classificados |
+| Após correção | **8/8 (100%)**| 100%    | +2 classes (graphql, dos) |
 
-The blind agent confirmed all 8 (introspection schema dump, BOLA, full-table
-excessive exposure, BFLA `makeAdmin`, batched-alias brute force, depth-16 query →
-3.6 MB response, SQLi via the `search` filter arg, field-suggestion leakage).
-Zero false positives.
+O agente às cegas confirmou todos os 8 (dump do schema por introspecção, BOLA,
+exposição excessiva da tabela inteira, `makeAdmin` por BFLA, força bruta por alias
+em batch, query com profundidade 16 → resposta de 3,6 MB, SQLi pelo argumento
+`filter` do `search`, vazamento por sugestão de campo). Zero falso positivo.
 
-## The gap this lab exposed
+## A lacuna que este laboratório revelou
 
-The engine already covered the *transport-agnostic* bugs that show up in GraphQL
-(BOLA→`idor`, BFLA→`bfla`, excessive data→`excessive-data`, batching→
-`no-rate-limit`, arg→`sqli`, verbose errors→`info-disc`). The two **GraphQL-shaped**
-issues had no home:
+O motor já cobria os bugs *agnósticos de transporte* que aparecem em GraphQL
+(BOLA→`idor`, BFLA→`bfla`, exposição excessiva→`excessive-data`, batching→
+`no-rate-limit`, argumento→`sqli`, erros verbosos→`info-disc`). Os dois problemas
+**com formato de GraphQL** não tinham lar:
 
-| Class | CWE | Catches |
-|-------|-----|---------|
-| `graphql` | 200 | introspection enabled, schema exposure, GraphQL-specific misconfig |
-| `dos` | 400 | uncontrolled resource consumption — query depth/complexity, amplification, missing limits |
+| Classe | CWE | Pega |
+|--------|-----|------|
+| `graphql` | 200 | introspecção habilitada, exposição de schema, má configuração específica de GraphQL |
+| `dos` | 400 | consumo descontrolado de recursos — profundidade/complexidade de query, amplificação, limites ausentes |
 
-Both kept deliberately **narrow** so they wouldn't poach neighbours: the
-`graphql` regex matches introspection/`__schema` only (not "batching", so the
-batched-brute finding stays `no-rate-limit`), and neither touches the
-field-suggestion finding (stays `info-disc`). Re-score: **8/8, 100%**.
+Ambas mantidas de propósito **estreitas** para não roubar as vizinhas: a regex de
+`graphql` casa só introspecção/`__schema` (não "batching", então o achado de
+força bruta em batch fica `no-rate-limit`), e nenhuma toca no achado de sugestão
+de campo (fica `info-disc`). Repontuação: **8/8, 100%**.
 
-## A regression the harness caught before it shipped
+## Uma regressão que o harness pegou antes de publicar
 
-The first attempt at the `dos` class referenced the module-level `_CS` URL prefix
-**inside the CLASSES list** — but `_CS` is defined later in the file, so importing
-`finding_model` raised `NameError` and `build_findings` silently fell back to the
-legacy parser. The full-campaign regression sweep flagged it instantly: **all
-seven labs dropped to 0%** in one run. Fixed (literal URL in the inline ref) and
-re-verified. A broken classifier engine would have degraded *every real
-engagement* — the answer-key loop caught it in seconds. That safety net is a
-large part of why this campaign exists.
+A primeira tentativa da classe `dos` referenciava o prefixo de URL de nível de
+módulo `_CS` **dentro da lista CLASSES** — mas `_CS` é definido mais adiante no
+arquivo, então importar o `finding_model` levantava `NameError` e o
+`build_findings` caía em silêncio no parser legado. A varredura de regressão da
+campanha inteira sinalizou na hora: **os sete labs caíram para 0%** numa única
+execução. Corrigido (URL literal na referência inline) e reverificado. Um motor de
+classificação quebrado teria degradado *todo engajamento real* — o ciclo do
+gabarito o pegou em segundos. Essa rede de segurança é grande parte do motivo de
+esta campanha existir.
 
-## Regression
+## Regressão
 
-After the fix: Labs 01-06 all unchanged (15/15, 12/12, 7/7, 9/9, 7/7, 8/8).
+Após a correção: labs 01-06 todos inalterados (15/15, 12/12, 7/7, 9/9, 7/7, 8/8).
 
-## Strong points confirmed
+## Pontos fortes confirmados
 
-- Recon source-mined `/graphql` from the JSON index (no wordlist hit needed).
-- The blind agent demonstrated real GraphQL tradecraft: introspection-driven
-  schema mapping, alias batching, exponential depth amplification, and
-  injection through a typed argument.
+- O reconhecimento minerou o `/graphql` do índice JSON (sem precisar de acerto de wordlist).
+- O agente às cegas demonstrou ofício real de GraphQL: mapeamento de schema
+  guiado por introspecção, batching por alias, amplificação exponencial por
+  profundidade e injeção por um argumento tipado.
