@@ -9,7 +9,7 @@
       "class": "insecure-storage",
       "severity": "high",
       "route": "*",
-      "desc": "StorageManager writes the auth token, session, and full card PAN to SharedPreferences in cleartext with MODE_WORLD_READABLE (0x1) — any other app on the device can read them — and an unencrypted SQLite DB (wallet.db, no SQLCipher) stores PII (CPF, full name, card number) in cleartext.",
+      "desc": "O StorageManager grava o token de autenticação, a sessão e o PAN completo do cartão no SharedPreferences em texto claro com MODE_WORLD_READABLE (0x1) — qualquer outro app no dispositivo pode lê-los — e um banco SQLite não criptografado (wallet.db, sem SQLCipher) armazena PII (CPF, nome completo, número do cartão) em texto claro.",
       "exploit": "run-as com.storagecrypt.app cat shared_prefs/session.xml ; adb pull databases/wallet.db -> cleartext token + PAN + PII.",
       "points": 1
     },

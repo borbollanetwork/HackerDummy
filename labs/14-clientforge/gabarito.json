@@ -8,7 +8,7 @@
       "class": "xss",
       "severity": "high",
       "route": "/search.html",
-      "desc": "DOM-based XSS: /search.html reads user-controlled location.hash (and location.search 'q') and writes it into the page via element.innerHTML and document.write with no encoding, so a crafted fragment/param executes script in the victim's browser.",
+      "desc": "XSS baseado em DOM: o /search.html lê location.hash (e o 'q' de location.search) controlados pelo usuário e os escreve na página via element.innerHTML e document.write sem codificação, então um fragmento/parâmetro forjado executa script no navegador da vítima.",
       "exploit": "Open /search.html#<img src=x onerror=alert(document.domain)> (or /search.html?q=<script>...) -> the payload is written to innerHTML/document.write and runs.",
       "points": 1
     },
@@ -17,7 +17,7 @@
       "class": "prototype-pollution",
       "severity": "high",
       "route": "*",
-      "desc": "Client-side prototype pollution: app.js merge() recursively copies attacker-controlled JSON into a target object with no __proto__/constructor guard, and /profile.html feeds it the URL ?prefs= value. A payload with a __proto__ key pollutes Object.prototype globally, enabling property injection / privilege-flag gadgets / DOM-XSS gadget chains.",
+      "desc": "Poluição de protótipo no lado do cliente: o merge() em app.js copia recursivamente JSON controlado pelo atacante para um objeto alvo sem proteção contra __proto__/constructor, e o /profile.html o alimenta com o valor da URL ?prefs=. Um payload com uma chave __proto__ polui o Object.prototype globalmente, viabilizando injeção de propriedade / gadgets de flag de privilégio / cadeias de gadget de DOM-XSS.",
       "exploit": "GET /profile.html?prefs={\"__proto__\":{\"isAdmin\":true}} -> merge() walks into __proto__ -> every object now has isAdmin=true (Object.prototype polluted).",
       "points": 1
     },
@@ -26,7 +26,7 @@
       "class": "open-redirect",
       "severity": "medium",
       "route": "/go.html",
-      "desc": "DOM-based open redirect: /go.html sets location.href to the unvalidated ?next= parameter (no allow-list / same-origin check), so it redirects to arbitrary external URLs and even executes javascript: URIs.",
+      "desc": "Open redirect baseado em DOM: o /go.html define location.href com o parâmetro ?next= não validado (sem lista de permissões / verificação de mesma origem), então redireciona para URLs externas arbitrárias e chega a executar URIs javascript:.",
       "exploit": "GET /go.html?next=https://evil.example/ (or next=javascript:alert(1)) -> browser navigates to the attacker target.",
       "points": 1
     },
@@ -44,7 +44,7 @@
       "class": "headers",
       "severity": "low",
       "route": "*",
-      "desc": "Missing security headers on all responses: no Content-Security-Policy (which would mitigate the DOM XSS), no X-Frame-Options/frame-ancestors, no X-Content-Type-Options.",
+      "desc": "Cabeçalhos de segurança ausentes em todas as respostas: sem Content-Security-Policy (que mitigaria o XSS de DOM), sem X-Frame-Options/frame-ancestors, sem X-Content-Type-Options.",
       "exploit": "curl -I any page -> no CSP/XFO/XCTO present.",
       "points": 1
     }

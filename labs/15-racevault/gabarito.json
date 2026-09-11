@@ -17,7 +17,7 @@
       "class": "idor",
       "severity": "high",
       "route": "/wallet",
-      "desc": "IDOR: GET /wallet?user=<name> returns ANY user's balance and profile with no authentication or ownership check, so an attacker enumerates and reads every account.",
+      "desc": "IDOR: o GET /wallet?user=<nome> retorna o saldo e o perfil de QUALQUER usuário sem autenticação nem verificação de propriedade, então um atacante enumera e lê todas as contas.",
       "exploit": "GET /wallet?user=bob (with no/own session) -> bob's balance and profile.",
       "points": 1
     },
@@ -35,7 +35,7 @@
       "class": "no-rate-limit",
       "severity": "medium",
       "route": "/login",
-      "desc": "Lack of rate limiting / lockout on POST /login: unlimited credential attempts with no throttle, delay, or lockout enable brute force and credential stuffing.",
+      "desc": "Falta de rate limiting / bloqueio no POST /login: tentativas de credencial ilimitadas, sem throttle, atraso ou bloqueio, viabilizam força bruta e credential stuffing.",
       "exploit": "Loop POST /login with candidate passwords -> no 429, no lockout, no delay.",
       "points": 1
     },
@@ -44,7 +44,7 @@
       "class": "headers",
       "severity": "low",
       "route": "*",
-      "desc": "Missing security headers on all responses: no Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options, or HSTS.",
+      "desc": "Cabeçalhos de segurança ausentes em todas as respostas: sem Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options nem HSTS.",
       "exploit": "curl -I any endpoint -> none of CSP/XFO/XCTO/HSTS present.",
       "points": 1
     }

@@ -26,7 +26,7 @@
       "class": "lfi",
       "severity": "high",
       "route": "/files",
-      "desc": "Path traversal (read) in the download endpoint: GET /files?name=<n> does os.path.join(uploads, name) with no normalization, so ../ escapes the uploads dir and reads arbitrary host files (e.g. the planted server-secrets.txt, /etc/passwd, app source).",
+      "desc": "Path traversal (leitura) no endpoint de download: o GET /files?name=<n> faz os.path.join(uploads, name) sem nenhuma normalização, então ../ escapa do diretório de uploads e lê arquivos arbitrários do host (por exemplo o server-secrets.txt plantado, /etc/passwd, o código-fonte da aplicação).",
       "exploit": "GET /files?name=../server-secrets.txt -> internal token/flag. GET /files?name=../app.py -> source.",
       "points": 1
     },
@@ -35,7 +35,7 @@
       "class": "stored-xss",
       "severity": "high",
       "route": "/view",
-      "desc": "Stored XSS via uploaded SVG/HTML: an uploaded .svg/.html is persisted and later served by GET /view?id=<n> with Content-Type text/html, so embedded <script> executes in the victim's browser. Classic upload-driven stored XSS (no output encoding, attacker-controlled content-type).",
+      "desc": "XSS armazenado via SVG/HTML enviado: um .svg/.html enviado é persistido e depois servido pelo GET /view?id=<n> com Content-Type text/html, então o <script> embutido executa no navegador da vítima. XSS armazenado clássico via upload (sem codificação de saída, content-type controlado pelo atacante).",
       "exploit": "Upload 'x.svg' containing <svg xmlns=...><script>alert(document.domain)</script></svg>. GET /view?id=<id> -> served as text/html, script runs.",
       "points": 1
     },
@@ -44,7 +44,7 @@
       "class": "idor",
       "severity": "medium",
       "route": "/view",
-      "desc": "IDOR on uploaded objects: GET /view?id=<sequential int> returns ANY user's uploaded file with no ownership check and no auth required. Enumerate ids to read other users' (incl. admin's) documents.",
+      "desc": "IDOR nos objetos enviados: o GET /view?id=<inteiro sequencial> retorna o arquivo enviado de QUALQUER usuário sem verificação de propriedade e sem exigir autenticação. Enumere os ids para ler os documentos de outros usuários (inclusive do admin).",
       "exploit": "GET /view?id=1 (admin's file) with no session, then id=2,3,... to read everyone's uploads.",
       "points": 1
     },
@@ -62,7 +62,7 @@
       "class": "headers",
       "severity": "low",
       "route": "*",
-      "desc": "Missing security headers across all responses: no Content-Security-Policy, no X-Frame-Options/frame-ancestors (clickjacking), no X-Content-Type-Options, no HSTS. Amplifies the stored-XSS and content-type-sniffing issues.",
+      "desc": "Cabeçalhos de segurança ausentes em todas as respostas: sem Content-Security-Policy, sem X-Frame-Options/frame-ancestors (clickjacking), sem X-Content-Type-Options, sem HSTS. Amplifica os problemas de XSS armazenado e de sniffing de content-type.",
       "exploit": "curl -I any endpoint -> none of CSP/XFO/XCTO/HSTS present.",
       "points": 1
     }

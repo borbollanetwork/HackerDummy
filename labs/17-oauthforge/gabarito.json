@@ -17,7 +17,7 @@
       "class": "csrf",
       "severity": "medium",
       "route": "/authorize",
-      "desc": "Missing state parameter / CSRF: the authorization flow accepts but never requires or binds a `state` value, so there is no CSRF protection on the OAuth flow (login CSRF / authorization-code injection / account linking forgery).",
+      "desc": "Parâmetro state ausente / CSRF: o fluxo de autorização aceita mas nunca exige nem vincula um valor `state`, então não há proteção contra CSRF no fluxo OAuth (CSRF de login / injeção de código de autorização / forja de vínculo de conta).",
       "exploit": "GET /authorize?client_id=webapp&response_type=code&redirect_uri=...  with NO state -> a code is still issued and the response confirms state_provided:false; the flow has no anti-CSRF binding.",
       "points": 1
     },
@@ -44,7 +44,7 @@
       "class": "headers",
       "severity": "low",
       "route": "*",
-      "desc": "Missing security headers on all responses: no Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options, or HSTS.",
+      "desc": "Cabeçalhos de segurança ausentes em todas as respostas: sem Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options nem HSTS.",
       "exploit": "curl -I any endpoint -> none of CSP/XFO/XCTO/HSTS present.",
       "points": 1
     }

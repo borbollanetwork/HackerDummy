@@ -26,7 +26,7 @@
       "class": "headers",
       "severity": "low",
       "route": "*",
-      "desc": "Missing security headers on all responses: no Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options, or HSTS.",
+      "desc": "Cabeçalhos de segurança ausentes em todas as respostas: sem Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options nem HSTS.",
       "exploit": "curl -I any endpoint -> none of CSP/XFO/XCTO/HSTS present.",
       "points": 1
     }

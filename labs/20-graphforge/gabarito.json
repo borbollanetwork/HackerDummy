@@ -26,7 +26,7 @@
       "class": "csrf",
       "severity": "medium",
       "route": "/graphql",
-      "desc": "GraphQL CSRF: mutations are accepted over GET (query in the URL) and over form-encoded POST (simple content-type) with no CSRF token and no application/json enforcement, so a cross-site request can perform state-changing mutations.",
+      "desc": "CSRF de GraphQL: as mutations são aceitas via GET (query na URL) e via POST form-encoded (content-type simples) sem token CSRF e sem exigir application/json, então uma requisição entre sites pode executar mutations que mudam estado.",
       "exploit": "GET /graphql?query=mutation{promoteToAdmin(userId:2){role}} (or a form POST) -> the mutation executes cross-site, no token required.",
       "points": 1
     },
@@ -44,7 +44,7 @@
       "class": "headers",
       "severity": "low",
       "route": "*",
-      "desc": "Missing security headers on all responses: no Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options, or HSTS.",
+      "desc": "Cabeçalhos de segurança ausentes em todas as respostas: sem Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options nem HSTS.",
       "exploit": "curl -I any endpoint -> none of CSP/XFO/XCTO/HSTS present.",
       "points": 1
     }

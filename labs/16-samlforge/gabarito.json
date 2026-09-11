@@ -26,7 +26,7 @@
       "class": "open-redirect",
       "severity": "medium",
       "route": "/sso/acs",
-      "desc": "Open redirect via RelayState: after consuming the assertion, /sso/acs redirects (302 Location) to the attacker-supplied RelayState with no allow-list / same-origin validation.",
+      "desc": "Open redirect via RelayState: após consumir a assertion, o /sso/acs redireciona (302 Location) para o RelayState fornecido pelo atacante sem lista de permissões / validação de mesma origem.",
       "exploit": "POST /sso/acs with a valid SAMLResponse and RelayState=https://evil.example/ -> 302 Location: https://evil.example/.",
       "points": 1
     },
@@ -44,7 +44,7 @@
       "class": "headers",
       "severity": "low",
       "route": "*",
-      "desc": "Missing security headers on all responses: no Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options, or HSTS.",
+      "desc": "Cabeçalhos de segurança ausentes em todas as respostas: sem Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options nem HSTS.",
       "exploit": "curl -I any endpoint -> none of CSP/XFO/XCTO/HSTS present.",
       "points": 1
     }
