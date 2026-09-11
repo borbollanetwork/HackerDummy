@@ -53,6 +53,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 def _die(message, code=2):
     """Exit with a message on stderr. Code 2 = usage/input error (argparse's own)."""
@@ -78,24 +79,72 @@ _LABEL_KEYS = ("title", "vuln", "vulnerability", "name", "type", "desc", "descri
 _LOC_KEYS = ("route", "url", "endpoint", "path", "location", "host", "target")
 
 
-def _norm_route(p):
-    """Normalize a route for matching: drop query, lowercase, and collapse
-    path-param segments (numeric id, <id>, :id, {id}) to '*' so /api/user/1
-    and /api/user/<id> match."""
-    p = str(p).split("?")[0].split("#")[0].rstrip("/").lower()
-    p = re.sub(r"/(\d+|<[^>]*>|:[\w-]+|\{[\w-]+\})(?=/|$|\s|[)\];,])", "/*", p)
-    return p
+_ID_SEGMENT_RE = re.compile(r"^(\d+|<[^>]*>|:[\w-]+|\{[\w-]+\})$")
+_AUTHORITY_RE = re.compile(r"^(?P<host>[a-z0-9.\-]*?)(?::(?P<port>\d+))?(?P<path>/.*)?$")
+
+
+def _route_parts(route):
+    """Split a route into (port, path segments).
+
+    Accepts every shape a finding or an answer key uses: "/login",
+    "http://target:8080/api/user/1", "127.0.0.1:6379", a bare port "6379".
+    Query and fragment are dropped, and path-param segments (numeric id, <id>,
+    :id, {id}) collapse to "*" so /api/user/1 and /api/user/<id> agree.
+    """
+    text = str(route).strip().lower().split("#")[0].split("?")[0]
+    if text in ("", "*", "/"):
+        return "", []                      # unknown location: matches nothing
+    if "://" in text:
+        try:
+            parsed = urlsplit(text)
+            port = str(parsed.port) if parsed.port else ""
+        except ValueError:                 # malformed authority, e.g. a bad port
+            parsed, port = urlsplit(text.split("://", 1)[1].split("/", 1)[-1]), ""
+        raw_path = parsed.path
+    elif text.isdigit():
+        return text, []                    # a bare port, e.g. "6379"
+    else:
+        found = _AUTHORITY_RE.match(text)
+        port = (found.group("port") or "") if found else ""
+        raw_path = (found.group("path") or "") if found else text
+        if not raw_path and not port:
+            raw_path = "/" + text          # a bare token like "actuator"
+    segments = ["*" if _ID_SEGMENT_RE.match(s) else s for s in raw_path.split("/") if s]
+    return port, segments
+
+
+def _covers(finding_segments, vuln_segments):
+    """True when the answer key's path appears as a run of whole segments in the
+    finding's path, so the finding is at least as specific as the planted vuln.
+
+    Whole segments only: /user does not cover /users/list. The run may start
+    anywhere and be followed by more segments, so an answer key of /uploads is
+    covered by a finding on /uploads/shell.php, and /login by /api/v1/login.
+    The reverse is not true: a finding that names only /api does NOT cover a
+    planted vuln on /api/users/search.
+    """
+    span = len(vuln_segments)
+    if not span or span > len(finding_segments):
+        return False
+    for offset in range(len(finding_segments) - span + 1):
+        window = finding_segments[offset:offset + span]
+        if all(v == f or "*" in (v, f) for v, f in zip(vuln_segments, window)):
+            return True
+    return False
 
 
 def _route_match(vuln_route, finding_routes):
     if vuln_route in ("*", "/", ""):
         return True  # host-level: any finding of this class matches
-    vr = _norm_route(vuln_route)
-    for r in finding_routes:
-        rr = _norm_route(r)
-        if not rr:
+    vuln_port, vuln_segments = _route_parts(vuln_route)
+    for route in finding_routes:
+        finding_port, finding_segments = _route_parts(route)
+        if vuln_port and finding_port and vuln_port != finding_port:
             continue
-        if vr and (vr in rr or rr.endswith(vr) or (len(rr) >= 4 and rr in vr)):
+        if vuln_segments:
+            if _covers(finding_segments, vuln_segments):
+                return True
+        elif vuln_port and vuln_port == finding_port:
             return True
     return False
 
