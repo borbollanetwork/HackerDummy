@@ -18,7 +18,7 @@
       "class": "weak-crypto",
       "severity": "high",
       "route": "*",
-      "desc": "CryptoUtils uses AES/ECB/NoPadding with a hardcoded 16-byte key (\"1234567890123456\") and an all-zero static IV reused for every message; the user PIN is hashed with unsalted MD5. ECB leaks block structure, the fixed key/IV make ciphertext trivially decryptable, and unsalted MD5 is brute-forced/rainbow-tabled instantly.",
+      "desc": "O CryptoUtils usa AES/ECB/NoPadding com uma chave de 16 bytes embutida no código (\"1234567890123456\") e um IV estático só de zeros reaproveitado em toda mensagem; o PIN do usuário é resumido com MD5 sem sal. O ECB vaza a estrutura dos blocos, a chave e o IV fixos tornam o texto cifrado trivialmente decifrável, e o MD5 sem sal cai instantaneamente por força bruta ou rainbow table.",
       "exploit": "grep -E 'AES/ECB|SecretKeySpec|IvParameterSpec|MD5' smali/ ; recover key from the dex, decrypt offline.",
       "points": 1
     },
@@ -27,7 +27,7 @@
       "class": "sensitive-log",
       "severity": "medium",
       "route": "*",
-      "desc": "StorageManager.saveSession logs the session token and full card PAN to logcat via Log.d on every save, so any process with READ_LOGS (or a pre-Android-4.1 device / a crash-reporting SDK) captures them.",
+      "desc": "O StorageManager.saveSession grava o token de sessão e o PAN completo do cartão no logcat via Log.d a cada gravação, então qualquer processo com READ_LOGS (ou um dispositivo anterior ao Android 4.1, ou um SDK de relato de falhas) os captura.",
       "exploit": "adb logcat | grep -iE 'token=|card_pan=' -> live session token + PAN.",
       "points": 1
     },
@@ -36,7 +36,7 @@
       "class": "backup-allowed",
       "severity": "medium",
       "route": "*",
-      "desc": "android:allowBackup=\"true\" makes all of the cleartext storage above extractable from a non-rooted device via adb backup.",
+      "desc": "android:allowBackup=\"true\" torna todo o armazenamento em texto claro descrito acima extraível de um dispositivo sem root via adb backup.",
       "exploit": "adb backup -f w.ab com.storagecrypt.app ; abe unpack -> the cleartext prefs + wallet.db.",
       "points": 1
     }

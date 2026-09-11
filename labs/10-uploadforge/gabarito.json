@@ -8,7 +8,7 @@
       "class": "upload",
       "severity": "critical",
       "route": "/upload",
-      "desc": "Unrestricted file upload -> webshell -> RCE. POST /upload (authenticated) saves the file with NO extension/MIME/magic-byte validation. An uploaded template is then rendered server-side by GET /render?doc=<name>, executing {{exec:<cmd>}} -> remote code execution. This is the full upload->webshell->RCE chain; class is 'upload' (RCE is the impact).",
+      "desc": "Envio irrestrito de arquivos -> webshell -> RCE. O POST /upload (autenticado) grava o arquivo SEM nenhuma validação de extensão, de MIME ou de magic bytes. Um template enviado é depois renderizado no servidor pelo GET /render?doc=<nome>, executando {{exec:<cmd>}} -> execução remota de código. Esta é a cadeia completa upload->webshell->RCE; a classe é 'upload' (o RCE é o impacto).",
       "exploit": "POST /login {operator/operator} -> token. POST /upload a file 'shell.tpl' with body '{{exec:whoami}}'. GET /render?doc=shell.tpl with the session -> command output in response (RCE).",
       "points": 1
     },
@@ -17,7 +17,7 @@
       "class": "default-creds",
       "severity": "high",
       "route": "/login",
-      "desc": "Default credentials never rotated: operator/operator grants an authenticated session (the entry point of the upload->RCE chain). Hinted in the / index ('operator onboarding uses the default operator/operator login until rotated').",
+      "desc": "Credenciais padrão nunca trocadas: operator/operator concede sessão autenticada (a porta de entrada da cadeia upload->RCE). A dica está na página inicial ('operator onboarding uses the default operator/operator login until rotated').",
       "exploit": "POST /login {\"username\":\"operator\",\"password\":\"operator\"} -> 200 + session token/cookie.",
       "points": 1
     },
@@ -53,7 +53,7 @@
       "class": "info-disc",
       "severity": "medium",
       "route": "*",
-      "desc": "Security misconfiguration (app-wide): debug mode on -> unhandled input returns a full Python traceback in the response body (reproducible e.g. GET /view?id=abc -> ValueError stack trace). Leaks source paths and internals.",
+      "desc": "Configuração insegura em toda a aplicação: modo de depuração ligado -> entrada não tratada devolve um traceback completo do Python no corpo da resposta (reproduzível, por exemplo, com GET /view?id=abc -> stack trace de ValueError). Vaza caminhos do código-fonte e detalhes internos.",
       "exploit": "GET /view?id=notanint -> 500 with full traceback.",
       "points": 1
     },

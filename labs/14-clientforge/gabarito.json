@@ -35,7 +35,7 @@
       "class": "creds",
       "severity": "medium",
       "route": "/static/app.js",
-      "desc": "Secret in client-side code: app.js hardcodes a privileged INTERNAL_API_KEY (and an analytics token) that is shipped to and downloadable by every visitor.",
+      "desc": "Segredo no código do cliente: o app.js embute uma INTERNAL_API_KEY privilegiada (e um token de analytics) que é entregue a todo visitante e pode ser baixado por ele.",
       "exploit": "GET /static/app.js -> INTERNAL_API_KEY = 'cf_live_...' visible in source, usable from any client.",
       "points": 1
     },

