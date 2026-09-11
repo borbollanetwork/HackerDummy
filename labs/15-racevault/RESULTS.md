@@ -1,57 +1,61 @@
-# Lab 15 — RaceVault — Results
+# Lab 15 — RaceVault — Resultados
 
-The first **business-logic** lab. It tests a *capability*, not a surface: can the
-agent find a flaw that is invisible to one-request-at-a-time testing? The crown jewel
-is a genuine **race condition** — the redeem endpoint has a real check-then-act
-(TOCTOU) window with no lock, so only an agent that fires **concurrent** requests
-finds it. The SKILL lists a business-logic specialist (race conditions / workflow
-skip); no prior lab had ever measured it.
+O primeiro lab de **lógica de negócio**. Ele testa uma *capacidade*, não uma
+superfície: o agente consegue achar uma falha invisível ao teste de uma requisição
+por vez? A joia da coroa é uma **condição de corrida** genuína — o endpoint de
+resgate tem uma janela real de check-then-act (TOCTOU) sem bloqueio, então só um
+agente que dispara requisições **concorrentes** a acha. A SKILL lista um
+especialista de lógica de negócio (condições de corrida / pular etapa de fluxo);
+nenhum lab anterior tinha medido isso.
 
-## Result: the plugin sent concurrent requests and won
+## Resultado: o plugin enviou requisições concorrentes e venceu
 
-Given a methodology-driven prompt (no hint that a race existed), the blind
-business-logic specialist captured the before-state, fired ~30 **parallel**
-`POST /redeem` of a single-use voucher, and observed the wallet over-credited
-(BONUS25 valued 25 → balance +75 = redeemed 3×). It correctly diagnosed the missing
-lock between the `used` check and the credit. That is the headline: the breadth-first
-business-logic methodology genuinely exercises concurrency, not just sequential probes.
+Dado um prompt guiado por metodologia (sem dica de que havia uma corrida), o
+especialista de lógica de negócio às cegas capturou o estado inicial, disparou ~30
+`POST /redeem` **paralelos** de um voucher de uso único e observou a carteira
+creditada a mais (BONUS25 valia 25 → saldo +75 = resgatado 3×). Ele diagnosticou
+corretamente a falta de bloqueio entre a verificação de `used` e o crédito. Este é o
+destaque: a metodologia em largura de lógica de negócio exercita concorrência de
+verdade, não só sondagens sequenciais.
 
-## Score
+## Nota
 
-| Pass | Recall | Precision | Notes |
-|------|--------|-----------|-------|
-| Baseline | **4/5 (80%)** | 67% | the race was detected but had no class (`other`) |
-| After fix | **5/5 (100%)** | 83% | extra (clickjacking) is a real bonus, zero false positives |
+| Passada | Recall | Precisão | Notas |
+|---------|--------|----------|-------|
+| Linha de base | **4/5 (80%)** | 67% | a corrida foi detectada mas não tinha classe (`other`) |
+| Após correção | **5/5 (100%)** | 83% | o extra (clickjacking) é bônus real, zero falso positivo |
 
-## The gap this lab exposed
+## A lacuna que este laboratório revelou
 
-**New class: `race-condition` (CWE-362).** The agent confirmed the TOCTOU
-double-spend, but neither `finding_model.py` nor the benchmark `classify.py` had a
-class for it, so it fell to `other`. Added the class to both (+ `TAXONOMY.md`),
-matching `race condition | TOCTOU | check-then-act | double-spend | concurrent
-<action>` wording, with CWE-362 + OWASP/PortSwigger references. The other four
-planted bugs classified correctly out of the box (idor, mass-assignment,
-no-rate-limit, headers).
+**Nova classe: `race-condition` (CWE-362).** O agente confirmou o gasto duplo por
+TOCTOU, mas nem o `finding_model.py` nem o `classify.py` do benchmark tinham classe
+para isso, então caiu em `other`. Classe adicionada aos dois (+ `TAXONOMY.md`),
+casando as formas `race condition | TOCTOU | check-then-act | double-spend |
+concurrent <ação>`, com CWE-362 + referências OWASP/PortSwigger. Os outros quatro
+bugs plantados classificaram certo de saída (idor, mass-assignment, no-rate-limit,
+headers).
 
-## A bug the blind run found in the lab itself
+## Um bug que a execução às cegas achou no próprio laboratório
 
-On the first pass the specialist reported a **null-comparison auth bypass** I had
-accidentally written: `USERS.get(u) == p` returns `None == None` for a non-existent
-user with `"password": null`, minting a session for any name (plus a `KeyError` DoS
-on the resulting ghost user). That is a real type-confusion bug — but unintended, and
-it trivialised the app's auth and blocked clean testing of the mass-assignment path.
-Fixed the lab to `u in USERS and p is not None and USERS[u] == p` and re-ran. (A nice
-demonstration that the harness catches the lab author's mistakes too.)
+Na primeira passada o especialista reportou um **desvio de autenticação por
+comparação nula** que eu tinha escrito por acidente: `USERS.get(u) == p` devolve
+`None == None` para um usuário inexistente com `"password": null`, cunhando uma
+sessão para qualquer nome (mais um DoS por `KeyError` no usuário fantasma
+resultante). Isso é um bug real de confusão de tipo — mas não intencional, e
+trivializava a autenticação da aplicação e bloqueava o teste limpo do caminho de
+atribuição em massa. Laboratório corrigido para `u in USERS and p is not None and
+USERS[u] == p` e rerrodado. (Uma boa demonstração de que o harness pega também os
+erros do autor do laboratório.)
 
-## Lab note
+## Nota do laboratório
 
-In-memory play-money; nothing real is at stake. The race is genuine — a threaded
-server with a real (small) TOCTOU window — so it reproduces only under concurrency,
-exactly like the real bug class.
+Dinheiro de brincadeira em memória; nada real está em jogo. A corrida é genuína — um
+servidor multithread com uma janela real (pequena) de TOCTOU — então reproduz só sob
+concorrência, exatamente como a classe de bug real.
 
-## Run it
+## Rodar
 
 ```bash
 python labs/15-racevault/app.py        # -> http://127.0.0.1:18815
-# test accounts: alice/alicepw, bob/bobpw
+# contas de teste: alice/alicepw, bob/bobpw
 ```

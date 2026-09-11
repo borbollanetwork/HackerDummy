@@ -1,48 +1,50 @@
-# M02 — StorageCrypt — Results
+# M02 — StorageCrypt — Resultados
 
-Rung 2: insecure local storage + broken crypto. The blind static specialist read
-the `app/` tree (manifest, two smali classes, `assets/db_schema.sql`) and produced
-**10 findings** — covering all four planted classes plus bonus (hardcoded AES key,
-static IV, MD5 PIN). Notably it **correctly did NOT raise a cleartext-network
-finding** (targetSdk 31 disables cleartext by default and there's no permissive
-network-security-config) — good false-positive discipline.
+Degrau 2: armazenamento local inseguro + criptografia quebrada. O especialista
+estático às cegas leu a árvore `app/` (manifesto, duas classes smali,
+`assets/db_schema.sql`) e produziu **10 achados** — cobrindo as quatro classes
+plantadas mais bônus (chave AES embutida no código, IV estático, PIN em MD5).
+Notavelmente ele **corretamente NÃO levantou um achado de rede em texto claro**
+(targetSdk 31 desabilita cleartext por padrão e não há network-security-config
+permissivo) — boa disciplina de falso positivo.
 
-## Score
+## Nota
 
-| Pass | Recall | Notes |
-|------|--------|-------|
-| After taxonomy | 3/4 (75%) | the `allowBackup` finding was stolen by `insecure-storage` (it names the prefs/DB it exposes) |
-| After reorder | **4/4 (100%)** | `backup-allowed` moved before `insecure-storage`; precision 40% (rest = bonus) |
+| Passada | Recall | Notas |
+|---------|--------|-------|
+| Após taxonomia | 3/4 (75%) | o achado de `allowBackup` foi roubado por `insecure-storage` (ele nomeia as prefs/DB que expõe) |
+| Após reordenação | **4/4 (100%)** | `backup-allowed` movido antes de `insecure-storage`; precisão 40% (o resto = bônus) |
 
-## The gaps this lab exposed
+## As lacunas que este laboratório revelou
 
-**Two new classes + one extension** (synced in `classify.py` and `finding_model.py`,
-documented in `TAXONOMY.md`):
+**Duas novas classes + uma extensão** (sincronizadas em `classify.py` e
+`finding_model.py`, documentadas em `TAXONOMY.md`):
 
-| class | CWE | signal |
-|-------|-----|--------|
-| `insecure-storage` | 312 | world-readable/plaintext SharedPreferences, unencrypted SQLite/PII |
-| `sensitive-log` | 532 | token/PII/PAN written to logcat (`Log.d`/`Log.v`) |
-| `weak-crypto` (extended) | 327 | + AES-ECB, static/zero IV, hardcoded crypto key (kept MD5/SHA1/unsalted) |
+| classe | CWE | sinal |
+|--------|-----|-------|
+| `insecure-storage` | 312 | SharedPreferences legível por todos/em texto plano, SQLite/PII sem criptografia |
+| `sensitive-log` | 532 | token/PII/PAN escrito no logcat (`Log.d`/`Log.v`) |
+| `weak-crypto` (estendida) | 327 | + AES-ECB, IV estático/zerado, chave de criptografia embutida no código (mantidos MD5/SHA1/sem sal) |
 
-**Three ordering/regression fixes** the sweep forced:
+**Três correções de ordem/regressão** que a varredura forçou:
 
-1. **`backup-allowed` before `insecure-storage`** — a real `allowBackup` finding
-   describes the data it exposes ("...extract the SharedPreferences and plaintext
-   `wallet.db`..."), so the storage class stole it. Root-cause class wins.
-2. **`insecure-storage` before `weak-crypto`** — so "plaintext token in
-   SharedPreferences" is a storage finding, while "MD5 hashing" stays crypto.
-3. **`sqli` → `\bsqli\b`** — the bare literal matched "**SQLi**te", mis-classing any
-   "unencrypted SQLite database" finding as SQL injection. Word-boundary keeps the
-   `SQLi` abbreviation while freeing `SQLite`.
+1. **`backup-allowed` antes de `insecure-storage`** — um achado real de `allowBackup`
+   descreve os dados que expõe ("...extrair as SharedPreferences e o `wallet.db` em
+   texto plano..."), então a classe de armazenamento o roubava. A classe de causa raiz
+   vence.
+2. **`insecure-storage` antes de `weak-crypto`** — para "token em texto plano nas
+   SharedPreferences" ser um achado de armazenamento, enquanto "hash MD5" fica cripto.
+3. **`sqli` → `\bsqli\b`** — o literal puro casava "**SQLi**te", classificando errado
+   qualquer achado de "unencrypted SQLite database" como injeção de SQL. A fronteira de
+   palavra mantém a abreviação `SQLi` enquanto libera `SQLite`.
 
-`sensitive-log` is anchored on real logging idioms (`logcat`, `Log.d/v`, "written
-to log") so it does **not** steal web findings like "login **token** in the URL".
+`sensitive-log` é ancorada em formas reais de log (`logcat`, `Log.d/v`, "written to
+log") para **não** roubar achados web como "login **token** in the URL".
 
-## Run it
+## Rodar
 
 ```bash
 python harness/score_lab.py \
   --gabarito labs/mobile/M02-storagecrypt/gabarito.json \
-  --findings your_agent_findings.json
+  --findings achados_do_seu_agente.json
 ```

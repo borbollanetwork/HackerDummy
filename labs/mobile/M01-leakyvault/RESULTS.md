@@ -1,60 +1,62 @@
-# M01 — LeakyVault — Results
+# M01 — LeakyVault — Resultados
 
-The first **mobile (Android)** lab — and the first rung of the mobile ladder.
-A wide-open decompiled app: no obfuscation, no RASP, pure static-analysis fruit.
+O primeiro lab **móvel (Android)** — e o primeiro degrau da escada móvel. Um
+aplicativo decompilado escancarado: sem ofuscação, sem RASP, fruta pura de análise
+estática.
 
-## Result: 5/5 (100% recall) — the gap was vocabulary, not detection
+## Resultado: 5/5 (100% de recall) — a lacuna foi vocabulário, não detecção
 
-| Pass | Recall | Precision | Notes |
-|------|--------|-----------|-------|
-| Baseline (no mobile classes) | — | — | the blind agent found everything; the classifier had no mobile vocabulary, so the findings fell to `other` |
-| After taxonomy | **5/5 (100%)** | 28% | precision <100% = bonus (the agent reports per-file instances; dedup collapses them) |
+| Passada | Recall | Precisão | Notas |
+|---------|--------|----------|-------|
+| Linha de base (sem classes móveis) | — | — | o agente às cegas achou tudo; o classificador não tinha vocabulário móvel, então os achados caíram em `other` |
+| Após taxonomia | **5/5 (100%)** | 28% | precisão <100% = bônus (o agente reporta instâncias por arquivo; a deduplicação as colapsa) |
 
-The blind static specialist analyzed the `app/` tree (manifest, `res/`, `assets/`,
-`smali/`) **without the answer key** and produced **18 findings** — every planted
-class plus genuine bonus: it caught all three exported components individually,
-flagged the **user-CA trust-anchor** in the network-security-config, the **Bearer
-token leaked to `Log.d`**, the duplicated secret across three extraction paths,
-the over-broad `WRITE_EXTERNAL_STORAGE`, and the outdated `targetSdkVersion 22`.
+O especialista estático às cegas analisou a árvore `app/` (manifesto, `res/`,
+`assets/`, `smali/`) **sem o gabarito** e produziu **18 achados** — toda classe
+plantada mais bônus genuíno: pegou os três componentes exportados individualmente,
+sinalizou o **trust-anchor de AC do usuário** no network-security-config, o **token
+Bearer vazado para `Log.d`**, o segredo duplicado nos três caminhos de extração, a
+`WRITE_EXTERNAL_STORAGE` ampla demais e o `targetSdkVersion 22` desatualizado.
 
-Just like the web campaign: **the agent detects nearly everything blind; the gap
-is the report engine naming it.**
+Igual à campanha web: **o agente detecta quase tudo às cegas; a lacuna é o motor de
+relatório nomeá-lo.**
 
-## The gap this lab exposed
+## A lacuna que este laboratório revelou
 
-The classifier had **zero Android vocabulary**. Added four mobile classes (to both
-`harness/classify.py` and the plugin's `finding_model.py`, kept in sync, plus
-`TAXONOMY.md`):
+O classificador tinha **zero vocabulário Android**. Adicionadas quatro classes móveis
+(tanto ao `harness/classify.py` quanto ao `finding_model.py` do plugin, mantidos em
+sincronia, mais `TAXONOMY.md`):
 
-| class | CWE | signal |
-|-------|-----|--------|
+| classe | CWE | sinal |
+|--------|-----|-------|
 | `debuggable` | 489 | `android:debuggable="true"` |
 | `backup-allowed` | 530 | `android:allowBackup="true"` |
-| `exported-component` | 926 | exported Activity/Service/Receiver/Provider, no permission |
-| `cleartext-traffic` | 319 | `usesCleartextTraffic` / network-security-config cleartext |
+| `exported-component` | 926 | Activity/Service/Receiver/Provider exportado, sem permissão |
+| `cleartext-traffic` | 319 | `usesCleartextTraffic` / cleartext no network-security-config |
 
-They are placed **before** the web `backup` / `admin-panel` / `headers` classes so
-the specific mobile class wins natural collisions (e.g. "adb **backup file**",
-"exported **Admin**Activity"). Two fixes fell out of the regression check:
+Elas são colocadas **antes** das classes web `backup` / `admin-panel` / `headers`
+para a classe móvel específica vencer as colisões naturais (por exemplo "adb **backup
+file**", "exported **Admin**Activity"). Duas correções saíram da checagem de
+regressão:
 
-- the `cleartext-traffic` regex originally led with a bare `cleartext`, which would
-  steal web findings like "**cleartext** credentials" → tightened to Android
-  cleartext-traffic idioms only;
-- `creds` didn't recognize **hardcoded-secret-in-APK** phrasing (api key / signing
-  secret in `strings.xml` / `smali` / `assets`) and was out of sync between the two
-  classifiers → unified and broadened in both.
+- a regex de `cleartext-traffic` originalmente começava com um `cleartext` puro, que
+  roubaria achados web como "**cleartext** credentials" → apertada para só as formas
+  de cleartext-traffic do Android;
+- `creds` não reconhecia a forma de **segredo embutido no APK** (chave de api /
+  segredo de assinatura em `strings.xml` / `smali` / `assets`) e estava fora de
+  sincronia entre os dois classificadores → unificada e ampliada nos dois.
 
-## Bonus findings → the ladder ahead
+## Achados bônus → a escada à frente
 
-The agent's extra findings preview later rungs: the **user-CA trust anchor** is the
-`improper-tls` class M03 introduces; the **`Log.d` token leak** is `sensitive-log`
-in M02. Built as designed.
+Os achados extras do agente antecipam degraus posteriores: o **trust-anchor de AC do
+usuário** é a classe `improper-tls` que o M03 introduz; o **vazamento de token por
+`Log.d`** é `sensitive-log` no M02. Construído como projetado.
 
-## Run it
+## Rodar
 
 ```bash
-# blind static analysis of the tree, then:
+# análise estática às cegas da árvore, depois:
 python harness/score_lab.py \
   --gabarito labs/mobile/M01-leakyvault/gabarito.json \
-  --findings your_agent_findings.json
+  --findings achados_do_seu_agente.json
 ```

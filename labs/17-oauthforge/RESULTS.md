@@ -1,63 +1,67 @@
-# Lab 17 — OAuthForge — Results
+# Lab 17 — OAuthForge — Resultados
 
-The first **OAuth 2.0 / OIDC** lab — modern federated auth, distinct from SAML
-(Lab 16). A stdlib-Python authorization server with the classic OAuth mistakes: an
-authorize endpoint that doesn't validate `redirect_uri` (auth-code theft), a flow
-with no `state` binding (OAuth CSRF), and a token endpoint that reuses codes, skips
-client authentication, and accepts a code without the PKCE verifier (PKCE downgrade).
+O primeiro lab de **OAuth 2.0 / OIDC** — autenticação federada moderna, distinta do
+SAML (Lab 16). Um servidor de autorização em Python só com a biblioteca padrão com os
+erros clássicos de OAuth: um endpoint de autorização que não valida o `redirect_uri`
+(roubo de código de autorização), um fluxo sem vínculo de `state` (CSRF de OAuth) e um
+endpoint de token que reusa códigos, pula a autenticação do cliente e aceita um código
+sem o verificador de PKCE (downgrade de PKCE).
 
-## Method
+## Método
 
-Full pipeline; the exploitation agent ran **blind**. It read
-`/.well-known/openid-configuration`, recognised the OAuth flow, and worked the OAuth
-checklist against the live server: sent an attacker `redirect_uri` (code 302'd to it),
-ran the flow with no `state`, exchanged a code with no `client_secret`, replayed the
-same code for multiple tokens, and redeemed a PKCE-challenged code with no verifier.
+Esteira completa; o agente de exploração rodou **às cegas**. Ele leu
+`/.well-known/openid-configuration`, reconheceu o fluxo OAuth e trabalhou a checklist
+de OAuth contra o servidor ao vivo: enviou um `redirect_uri` de atacante (o código foi
+302 para ele), rodou o fluxo sem `state`, trocou um código sem `client_secret`,
+repetiu o mesmo código por vários tokens e resgatou um código com challenge de PKCE
+sem o verificador.
 
-## Score
+## Nota
 
-| Pass | Recall | Precision | Notes |
-|------|--------|-----------|-------|
-| Baseline | **2/5 (40%)** | 40% | missing-state → `other` (no CSRF class); token flaws → `other`; verbose error not triggered |
-| After fix | **5/5 (100%)** | 80% | extras (redirect scheme injection, response_type) are real bonus, zero false positives |
+| Passada | Recall | Precisão | Notas |
+|---------|--------|----------|-------|
+| Linha de base | **2/5 (40%)** | 40% | state ausente → `other` (sem classe CSRF); falhas de token → `other`; erro verboso não disparado |
+| Após correção | **5/5 (100%)** | 80% | os extras (injeção de scheme no redirect, response_type) são bônus reais, zero falso positivo |
 
-The blind agent **found every OAuth flaw** (and extras — `javascript:`/`data:`
-redirect_uri, response_type not validated). The gaps were all classification, plus
-one lab-discoverability fix.
+O agente às cegas **achou toda falha de OAuth** (e extras — `redirect_uri`
+`javascript:`/`data:`, response_type não validado). As lacunas foram todas de
+classificação, mais uma correção de descobribilidade do laboratório.
 
-## The gaps this lab exposed
+## As lacunas que este laboratório revelou
 
-**1. New class: `csrf` (CWE-352).** The missing-`state` / OAuth-CSRF finding had no
-class. Added `csrf` (cross-site request forgery / missing anti-CSRF token /
-unvalidated OAuth `state` / missing SameSite) to both classifiers + `TAXONOMY.md`.
-It is placed **before `auth`**: a "missing state → OAuth CSRF / authorization-code
-injection" finding is primarily CSRF, but the OAuth auth-vocab (below) would
-otherwise grab "code injection". csrf-before-auth keeps CSRF findings as CSRF while
-the token-endpoint flaws still fall through to `auth`.
+**1. Nova classe: `csrf` (CWE-352).** O achado de `state` ausente / CSRF de OAuth não
+tinha classe. Adicionada `csrf` (cross-site request forgery / token anti-CSRF ausente
+/ `state` de OAuth sem validação / SameSite ausente) aos dois classificadores +
+`TAXONOMY.md`. Ela é colocada **antes de `auth`**: um achado de "state ausente → CSRF
+de OAuth / injeção de código de autorização" é primariamente CSRF, mas o vocabulário
+de autenticação de OAuth (abaixo) de outro modo pegaria "code injection".
+csrf-antes-de-auth mantém achados de CSRF como CSRF enquanto as falhas do endpoint de
+token ainda caem em `auth`.
 
-**2. `auth` now recognises OAuth token-endpoint flaws.** "Authorization Code Reuse",
-"PKCE Not Enforced", and "Client Authentication Not Enforced" all classified as
-`other`. Added OAuth vocabulary to `auth`: `pkce | code_challenge/verifier |
-authorization code reuse/replay | code reuse | client authentication not enforced |
-oauth downgrade/reuse/replay`. (A SAML signature bypass still → `auth`; Lab 02 JWT
-stays `jwt`.)
+**2. `auth` agora reconhece falhas do endpoint de token OAuth.** "Authorization Code
+Reuse", "PKCE Not Enforced" e "Client Authentication Not Enforced" classificavam todos
+como `other`. Adicionado vocabulário de OAuth a `auth`: `pkce | code_challenge/verifier
+| authorization code reuse/replay | code reuse | client authentication not enforced |
+oauth downgrade/reuse/replay`. (Um desvio de assinatura SAML ainda → `auth`; o JWT do
+Lab 02 fica `jwt`.)
 
-**3. Lab discoverability (info-disc).** The verbose-error trigger (a malformed OIDC
-`claims` JSON) was both undiscoverable (not advertised) and gated behind a valid
-authorization code — so an error-fuzzer always hit the graceful `invalid_grant` and
-concluded "debug off". Fixed the lab: the discovery document now advertises
-`claims_parameter_supported`, and the `claims` JSON is parsed *before* grant
-validation, so fuzzing the documented parameter reliably surfaces the traceback.
-(A faithful fix — a real OIDC server advertises `claims` support — not a give-away.)
+**3. Descobribilidade do laboratório (info-disc).** O gatilho de erro verboso (um JSON
+de `claims` do OIDC malformado) era ao mesmo tempo indescobrível (não anunciado) e
+travado atrás de um código de autorização válido — então um fuzzer de erro sempre
+batia no `invalid_grant` gracioso e concluía "debug desligado". Laboratório corrigido:
+o documento de descoberta agora anuncia `claims_parameter_supported`, e o JSON de
+`claims` é interpretado *antes* da validação do grant, então fuzzar o parâmetro
+documentado revela o traceback de forma confiável. (Uma correção fiel — um servidor
+OIDC real anuncia suporte a `claims` — não uma entrega de resposta.)
 
-Re-score: **5/5**, all 17 labs still 100%.
+Repontuação: **5/5**, todos os 17 labs ainda 100%.
 
-## Lab note
+## Nota do laboratório
 
-In-memory; nothing real is at stake. Token/secret strings are non-functional
-placeholders. Registered client: `webapp`, redirect_uri `http://127.0.0.1:18817/callback`.
+Em memória; nada real está em jogo. As strings de token/segredo são marcadores sem
+função. Cliente registrado: `webapp`, redirect_uri `http://127.0.0.1:18817/callback`.
 
-## Run it
+## Rodar
 
 ```bash
 python labs/17-oauthforge/app.py        # -> http://127.0.0.1:18817
