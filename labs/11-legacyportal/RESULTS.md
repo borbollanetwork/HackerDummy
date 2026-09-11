@@ -1,74 +1,78 @@
-# Lab 11 — LegacyPortal (PHP) — Results
+# Lab 11 — LegacyPortal (PHP) — Resultados
 
-Scoring the DroidAgent plugin against LegacyPortal's 6 planted vulns. The plugin
-ran the **full pipeline** (engage-init → passive_audit + content_discovery →
-specialist_dispatcher → Fase-4 specialists), exploitation agents **blind** — live
-target + the plugin's own knowledge base only, never the answer key. This is the
-first PHP lab; it exercises the LFI-wrapper machinery (php://filter, traversal,
-upload→LFI→RCE polyglot) that the plugin documents but no lab had ever measured.
+Pontuação do plugin DroidAgent contra as 6 vulnerabilidades plantadas do
+LegacyPortal. O plugin rodou a **esteira completa** (engage-init → passive_audit +
+content_discovery → specialist_dispatcher → especialistas da Fase 4), com os
+agentes de exploração **às cegas** — só alvo ao vivo + a base de conhecimento do
+próprio plugin, nunca o gabarito. É o primeiro lab PHP; exercita a maquinaria de
+wrappers de LFI (php://filter, travessia, poliglota upload→LFI→RCE) que o plugin
+documenta mas que nenhum lab tinha medido.
 
-## Method
+## Método
 
-Four blind Fase-4 specialists (LFI/RCE, upload, auth, info-disc). They confirmed
-every planted vuln with live requests: php://filter source disclosure of
-`config.php` (DB creds + flag), `../` traversal reading host files, a GIF89a/MIME
-polyglot upload included via the LFI to execute arbitrary PHP (`php_uname()`,
-`7*7=49` — RCE; OS-exec is neutralized by engine `disable_functions`, so the host
-is safe), phpinfo exposure, PHP type-juggling auth bypass (`key=0e1` / `key=0`),
-verbose-error path disclosure, and missing headers.
+Quatro especialistas da Fase 4 às cegas (LFI/RCE, upload, autenticação, info-disc).
+Eles confirmaram toda plantada com requisições ao vivo: divulgação do código-fonte
+de `config.php` por php://filter (credenciais do banco + flag), travessia com `../`
+lendo arquivos do host, um upload poliglota GIF89a/MIME incluído via LFI para
+executar PHP arbitrário (`php_uname()`, `7*7=49` — RCE; a execução do sistema é
+neutralizada pelo `disable_functions` do motor, então o host está seguro),
+exposição de phpinfo, desvio de autenticação por type juggling do PHP (`key=0e1` /
+`key=0`), divulgação de caminho por erro verboso e cabeçalhos ausentes.
 
-## Score
+## Nota
 
-| Pass | Recall | Precision | Notes |
-|------|--------|-----------|-------|
-| Baseline | **4/6 (67%)** | 40% | LFI found but route-mismatched; type-juggling stolen by `admin-panel` |
-| After fix | **6/6 (100%)** | 60% | precision <100% = real bonus (RCE chain, allow_url_fopen SSRF risk, version, clickjacking), zero false positives |
+| Passada | Recall | Precisão | Notas |
+|---------|--------|----------|-------|
+| Linha de base | **4/6 (67%)** | 40% | LFI achado mas com rota incompatível; type-juggling roubado por `admin-panel` |
+| Após correção | **6/6 (100%)** | 60% | precisão <100% = bônus reais (cadeia de RCE, risco de SSRF por allow_url_fopen, versão, clickjacking), zero falso positivo |
 
-The plugin **detected everything blind on the first pass** — including the full
-upload→LFI→RCE chain. The gap was, again, **classification + recon plumbing**, not
-detection.
+O plugin **detectou tudo às cegas na primeira passada** — inclusive a cadeia
+completa upload→LFI→RCE. A lacuna foi, de novo, **classificação + encanamento do
+reconhecimento**, não detecção.
 
-## The gaps this lab exposed
+## As lacunas que este laboratório revelou
 
-**1. `auth` had no vocabulary for auth-bypass / type juggling (finding_model fix).**
-The type-juggling finding was titled "PHP Type Juggling Authentication Bypass —
-Admin Panel", so it was stolen by the `admin-panel` class (the title literally
-contains "Admin Panel"). The `auth` class only knew password-reset/recovery wording.
-Added `authentication bypass | auth bypass | login bypass | type juggling | magic
-hash | loose comparison` to `auth` (which precedes `admin-panel`), so the bypass is
-classified as `auth`. Regression-checked: "SQL injection authentication bypass"
-still → `sqli`, "Admin panel exposed" still → `admin-panel`, "predictable password
-reset token" still → `auth`.
+**1. `auth` não tinha vocabulário para desvio de autenticação / type juggling
+(correção no finding_model).** O achado de type-juggling foi intitulado "PHP Type
+Juggling Authentication Bypass — Admin Panel", então foi roubado pela classe
+`admin-panel` (o título contém literalmente "Admin Panel"). A classe `auth` só sabia
+das formas de redefinição/recuperação de senha. Adicionado `authentication bypass |
+auth bypass | login bypass | type juggling | magic hash | loose comparison` a `auth`
+(que precede `admin-panel`), para o desvio ser classificado como `auth`. Verificado
+por regressão: "SQL injection authentication bypass" ainda → `sqli`, "Admin panel
+exposed" ainda → `admin-panel`, "predictable password reset token" ainda → `auth`.
 
-**2. No `php-page-controller-lfi` signal for the `?page=` LFI param (recon fix).**
-`content_discovery` flagged the upload form but not the obvious `?page=` LFI — the
-critical-severity star of this lab. Added a conservative LFI-param detector: it
-emits `php-page-controller-lfi` (→ `specialist-lfi-php-page-controller`, P0) when a
-file-include-ish param (`page/file/include/template/path/...`) carries a file/path/
-wrapper value, and stays silent on pagination (`?page=2`, `?page=next`). The
-dispatcher now auto-spawns the LFI specialist (0 unmapped) — the LFI vector no
-longer depends on the LLM noticing the param.
+**2. Sem sinal `php-page-controller-lfi` para o parâmetro LFI `?page=` (correção no
+reconhecimento).** O `content_discovery` sinalizou o formulário de upload mas não o
+LFI óbvio `?page=` — a estrela de severidade crítica deste lab. Adicionado um
+detector conservador de parâmetro de LFI: ele emite `php-page-controller-lfi` (→
+`specialist-lfi-php-page-controller`, P0) quando um parâmetro com cara de inclusão
+de arquivo (`page/file/include/template/path/...`) carrega um valor de
+arquivo/caminho/wrapper, e fica em silêncio em paginação (`?page=2`, `?page=next`).
+O dispatcher agora gera automaticamente o especialista de LFI (0 sem mapeamento) — o
+vetor de LFI não depende mais de o LLM notar o parâmetro.
 
-**3. Answer-key route was over-strict.** P1's route was `/index.php`, but the LFI
-front controller is equally reachable at `/?page=` (the plugin reported that form).
-Relaxed P1's route to the front-controller root `/`.
+**3. A rota do gabarito era estrita demais.** A rota de P1 era `/index.php`, mas o
+front controller do LFI é igualmente alcançável em `/?page=` (o plugin reportou essa
+forma). A rota de P1 foi relaxada para a raiz do front controller `/`.
 
-Re-score: **6/6**, and **no regression** — all 11 labs remain 100% recall.
+Repontuação: **6/6**, e **sem regressão** — todos os 11 labs seguem com 100% de recall.
 
-## Lab safety
+## Segurança do laboratório
 
-LegacyPortal is genuinely vulnerable (real unsanitized `include()`, real arbitrary
-PHP execution via the upload→LFI chain), but the server is launched with
-`disable_functions` covering OS-exec (`system`/`exec`/…) and destructive file ops
-(`unlink`/`file_put_contents`/…). So an included webshell **executes PHP** (proving
-RCE and reading source) but cannot run shell commands or damage the host. A router
-script also makes the built-in server return real 404s (otherwise PHP's CLI server
-falls back to index.php for every path, which would make any content scan think the
-whole wordlist exists).
+O LegacyPortal é genuinamente vulnerável (um `include()` sem sanitização real,
+execução de PHP arbitrário real via a cadeia upload→LFI), mas o servidor é iniciado
+com `disable_functions` cobrindo a execução do sistema (`system`/`exec`/…) e as
+operações de arquivo destrutivas (`unlink`/`file_put_contents`/…). Então uma
+webshell incluída **executa PHP** (comprovando o RCE e lendo o código-fonte) mas não
+pode rodar comandos de shell nem danificar o host. Um script roteador também faz o
+servidor embutido devolver 404s reais (senão o servidor CLI do PHP recai no
+index.php para todo caminho, o que faria qualquer varredura de conteúdo achar que a
+wordlist inteira existe).
 
-## Run it
+## Rodar
 
 ```bash
-# needs PHP on PATH (or scoop's php)
-./serve.sh        # or:  pwsh ./serve.ps1     ->  http://127.0.0.1:18811
+# precisa do PHP no PATH (ou o php do scoop)
+./serve.sh        # ou:  pwsh ./serve.ps1     ->  http://127.0.0.1:18811
 ```

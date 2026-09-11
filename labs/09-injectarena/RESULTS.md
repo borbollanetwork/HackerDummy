@@ -1,38 +1,40 @@
-# Lab 09 — InjectArena — Results
+# Lab 09 — InjectArena — Resultados
 
-Scoring the DroidAgent plugin against InjectArena's 5 beyond-SQL injection vulns.
-The exploitation agents ran **blind** (live target + plugin knowledge base, never
-the answer key).
+Pontuação do plugin DroidAgent contra as 5 vulnerabilidades de injeção além de SQL
+do InjectArena. Os agentes de exploração rodaram **às cegas** (alvo ao vivo + base
+de conhecimento do plugin, nunca o gabarito).
 
-## Method
+## Método
 
-Blind injection specialists tested each endpoint and confirmed all five with live
-payloads: NoSQL operator injection (`$ne` auth bypass) on `/login`, LDAP injection
-on `/directory`, XPath injection on `/employee`, SSI injection on `/greet`, and CSV
-/ formula injection on `/export`. `score_lab.py` matched by class + route.
+Especialistas de injeção às cegas testaram cada endpoint e confirmaram todos os
+cinco com payloads ao vivo: injeção de operador NoSQL (desvio de autenticação por
+`$ne`) em `/login`, injeção de LDAP em `/directory`, injeção de XPath em
+`/employee`, injeção de SSI em `/greet` e injeção de CSV / fórmula em `/export`. O
+`score_lab.py` casou por classe + rota.
 
-## Score
+## Nota
 
-| Pass | Recall | Precision | Notes |
-|------|--------|-----------|-------|
-| Baseline | **0/5 (0%)** | — | the plugin **detected all five** but had no class to name them → all fell to `sqli`/`other` |
-| After fix | **5/5 (100%)** | — | five dedicated injection classes added |
+| Passada | Recall | Precisão | Notas |
+|---------|--------|----------|-------|
+| Linha de base | **0/5 (0%)** | — | o plugin **detectou todos os cinco** mas não tinha classe para nomeá-los → todos caíram em `sqli`/`other` |
+| Após correção | **5/5 (100%)** | — | cinco classes de injeção dedicadas adicionadas |
 
-## The gap this lab exposed
+## A lacuna que este laboratório revelou
 
-The plugin *knew* these techniques (the knowledge base documents NoSQL/LDAP/XPath/
-SSI/CSV injection) but the report engine had **no canonical class** for any of them,
-so it could not name what it found. Added 5 classes to `finding_model.py` **and** the
-benchmark's `classify.py`:
+O plugin *conhecia* essas técnicas (a base de conhecimento documenta injeção de
+NoSQL/LDAP/XPath/SSI/CSV) mas o motor de relatório **não tinha classe canônica**
+para nenhuma delas, então não conseguia nomear o que achava. Adicionadas 5 classes
+ao `finding_model.py` **e** ao `classify.py` do benchmark:
 
-| Class | CWE | Note |
-|-------|-----|------|
-| `nosqli` | 943 | **must precede `sqli`** — "NoSQL Injection" contains "sql inj" |
+| Classe | CWE | Nota |
+|--------|-----|------|
+| `nosqli` | 943 | **precisa preceder `sqli`** — "NoSQL Injection" contém "sql inj" |
 | `ldap-injection` | 90 | |
 | `xpath-injection` | 643 | |
 | `ssi-injection` | 97 | server-side includes / ESI |
-| `csv-injection` | 1236 | formula / spreadsheet injection |
+| `csv-injection` | 1236 | injeção de fórmula / planilha |
 
-Ordering matters: `nosqli` is placed **before** `sqli` so the more specific class
-wins. Re-score: **5/5**, no regression across the other labs. Same pattern as every
-other lab — **detection was complete; the gap was classification vocabulary.**
+A ordem importa: `nosqli` é colocada **antes** de `sqli` para a classe mais
+específica vencer. Repontuação: **5/5**, sem regressão nos outros labs. Mesmo
+padrão de todo outro laboratório — **a detecção foi completa; a lacuna foi
+vocabulário de classificação.**
