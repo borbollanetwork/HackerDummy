@@ -228,8 +228,8 @@ pesquisável por um agente de análise estática *e* reconstruível em um APK re
 com `apktool b`. Mesmo contrato dos laboratórios web: um gabarito
 `gabarito.json`, pontuado por **classe + localização**.
 
-A escada sobe de um aplicativo escancarado até um blindado como um alvo real de
-banco mobile (RASP, pinning nativo, anti-instrumentação, ofuscação):
+A escala de dificuldade vai de um aplicativo escancarado até um blindado como um
+alvo real de banco mobile (RASP, pinning nativo, anti-instrumentação, ofuscação):
 
 | Degrau | Laboratório | Tema |
 |--------|-------------|------|
