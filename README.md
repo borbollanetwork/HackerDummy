@@ -44,8 +44,8 @@ assim é pontuado em terreno comum.
 
 > ⚠️ **Toda aplicação aqui é vulnerável de propósito** e escuta em `127.0.0.1`.
 > Treino apenas em localhost. Nunca exponha nenhuma delas; nunca reaproveite uma
-> credencial de semente. Todas as strings com cara de segredo são marcadores sem
-> função.
+> credencial pré-configurada do laboratório. Todas as strings com cara de segredo
+> são marcadores sem função.
 
 ## Por que existe
 
