@@ -14,11 +14,12 @@
 #   ./benchmark-lock.sh status    # ver estado atual
 #
 # Variavel de ambiente:
-#   HACKERDUMMY_ROOT  raiz do projeto (default: $HOME/tools/HackerDummy)
+#   HACKERDUMMY_ROOT  override opcional da raiz do projeto.
 
 set -euo pipefail
 
-ROOT="${HACKERDUMMY_ROOT:-$HOME/tools/HackerDummy}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+ROOT="${HACKERDUMMY_ROOT:-$SCRIPT_DIR}"
 LABS_DIR="$ROOT/labs"
 VAULT="$ROOT/.gabarito-vault"
 MANIFEST="$VAULT/manifest.tsv"

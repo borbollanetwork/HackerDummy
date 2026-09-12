@@ -49,33 +49,6 @@ _TARGET_PORT_OVERRIDES = {
     "20-graphforge": 18821,
 }
 
-# surface descriptions (vuln counts come from each lab's gabarito.json at runtime)
-LAB_METADATA = {
-    "01-vulnshop": "Classic web injection: SQLi, XSS, IDOR, SSRF, open-redirect, exposed .git/.env/backup, dir-listing, headers, cookie, info-disc, admin panel.",
-    "02-vaultauth": "Auth / JWT / session: alg:none, weak secret, user-enum, no-rate-limit, OTP bypass, mass-assignment, MD5 storage, broken session.",
-    "03-relaykit": "Server-side: SSRF + filter bypass, XXE, insecure deserialization, command injection, LFI, SSTI.",
-    "04-shopapi": "OWASP API Top 10: BOLA, BFLA, mass-assignment, excessive data exposure, JWT, rate-limit, SSRF, verbose errors.",
-    "05-springvault": "Java / Spring Boot Actuator: /env, /heapdump, Jolokia, H2 console, cleartext credentials.",
-    "06-openservices": "Infra: Redis, Elasticsearch, Mongo, CouchDB, Docker, Memcached, MySQL unauthenticated + default credentials.",
-    "07-graphvault": "GraphQL: introspection, BOLA, excessive data, BFLA, batching, depth DoS, SQLi, field suggestions.",
-    "08-trustedge": "Trust-boundary / header: CORS reflection, Host-header injection, X-Forwarded-Host, CRLF splitting, cache poisoning.",
-    "09-injectarena": "Beyond-SQL injection: NoSQL operator, LDAP, XPath, SSI, CSV / formula injection.",
-    "10-uploadforge": "File-upload: unrestricted upload -> webshell/RCE, default-creds chain, traversal read, SVG stored-XSS, IDOR.",
-    "11-legacyportal": "PHP LFI-wrappers: php://filter disclosure, traversal, upload->LFI->RCE polyglot, phpinfo, type-juggling auth bypass.",
-    "12-cloudpivot": "Chaining: SSRF -> cloud IMDS instance-role credential theft -> token reuse -> RCE, plus verbose errors.",
-    "13-aspnetvault": ".NET / IIS: exposed web.config (connStrings/machineKey), ViewState deserialization, ASP.NET trace viewer, version banners.",
-    "14-clientforge": "Client-side: DOM XSS, prototype pollution, DOM open-redirect, hardcoded JS secret, missing CSP.",
-    "15-racevault": "Business-logic / concurrency: TOCTOU voucher double-redeem, wallet IDOR, mass-assignment, no-rate-limit.",
-    "16-samlforge": "SAML 2.0 SP: signature-bypass auth, XXE via SAMLResponse, RelayState open-redirect, verbose errors.",
-    "17-oauthforge": "OAuth2 / OIDC AS: unvalidated redirect_uri, missing state/CSRF, broken token endpoint, verbose errors.",
-    "18-javaforge": "Java / Tomcat: native deserialization (rO0AB) -> RCE, default Manager creds, verbose Java stack traces, EOL stack.",
-    "19-smuggleforge": "HTTP request smuggling: genuine CL.TE front-end/back-end desync, Server-banner disclosure, missing headers.",
-    "20-graphforge": "Advanced GraphQL: alias cost-amplification DoS, unauth promoteToAdmin (BFLA), GraphQL CSRF via GET/form, introspection.",
-    # Mobile labs are STATIC APK trees (jadx/apktool), analyzed offline — no server.
-    "M01-leakyvault": "Android APK (static): android:debuggable, exported components, allowBackup, cleartext traffic, hardcoded secrets in smali/strings, world-readable SharedPreferences.",
-    "M02-storagecrypt": "Android APK (static): insecure local storage (world-readable prefs, cleartext SQLite) + broken crypto (ECB/DES/MD5, hardcoded key/IV, weak PRNG).",
-}
-
 _LOCK = threading.RLock()
 LABS = {}  # name -> {index, folder, command, process, log_file}
 
@@ -120,24 +93,11 @@ def discover():
 
 
 def discover_mobile():
-    """Mobile labs are STATIC APK trees (no server): a folder with gabarito.json."""
+    """Mobile labs are STATIC APK trees (no server): a folder with app/."""
     if not MOBILE_DIR.exists():
         return []
-    return sorted((f for f in MOBILE_DIR.iterdir() if f.is_dir() and (f / "gabarito.json").is_file()),
+    return sorted((f for f in MOBILE_DIR.iterdir() if f.is_dir() and (f / "app").is_dir()),
                   key=lambda f: f.name)
-
-
-def vuln_count(folder):
-    gab = folder / "gabarito.json"
-    if not gab.is_file():
-        return 0
-    try:
-        data = json.loads(gab.read_text(encoding="utf-8", errors="ignore"))
-    except Exception:
-        return 0
-    if isinstance(data, dict) and isinstance(data.get("vulns"), list):
-        return len(data["vulns"])
-    return len(data) if isinstance(data, list) else 0
 
 
 def refresh_inventory():
@@ -223,8 +183,11 @@ def start_lab(lab, timeout=5.0):
         if not is_alive(lab):
             break
         if detect_port(lab):
-            break
+            return True
         time.sleep(0.2)
+    if is_alive(lab):
+        stop_lab(lab)
+    return False
 
 
 def stop_lab(lab):
@@ -259,13 +222,12 @@ def serialize():
             static = lab.get("static", False)
             alive = is_alive(lab)
             port = detect_port(lab) if (alive and not static) else None
-            status = "STATIC" if static else ("UP" if alive else "DOWN")
+            status = "STATIC" if static else ("UP" if alive and port else "DOWN")
             out.append({"id": lab["folder"].name, "lab": lab["index"], "folder": lab["folder"].name,
                         "status": status, "port": port or "N/A",
                         "url": f"http://{port}" if port else None,
                         "static": static,
-                        "vulns": vuln_count(lab["folder"]),
-                        "description": LAB_METADATA.get(lab["folder"].name, "—")})
+                        "description": "Lab de treinamento; enumere a superfície sem consultar o gabarito."})
     return out
 
 
@@ -336,8 +298,8 @@ function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=nu
 function card(l){const c=el("article","card");const top=el("div","top");const w=el("div");
 w.appendChild(el("h3","lt","LAB "+l.lab));w.appendChild(el("p","ln",l.folder));
 const chipCls=l.static?"static":(l.status==="UP"?"up":"down");
-const b=el("div");const v=el("span","chip v",l.vulns+" vulns");const s=el("span","chip "+chipCls,l.status);
-b.appendChild(v);b.appendChild(s);top.appendChild(w);top.appendChild(b);
+const b=el("div");const s=el("span","chip "+chipCls,l.status);
+b.appendChild(s);top.appendChild(w);top.appendChild(b);
 const tg=el("div","target",l.static?"Artefato":"Target");const st=el("strong");
 if(l.static)st.textContent="APK estático — jadx/apktool";
 else if(l.url){const a=el("a",null,l.port);a.href=l.url;a.target="_blank";st.appendChild(a)}
@@ -355,7 +317,7 @@ async function load(){const d=await api("/api/labs");const labs=d.labs;
 document.getElementById("t").textContent=labs.length;
 document.getElementById("u").textContent=labs.filter(x=>x.status==="UP").length;
 document.getElementById("d").textContent=labs.filter(x=>x.status==="DOWN").length;
-document.getElementById("v").textContent=labs.reduce((a,x)=>a+(+x.vulns||0),0);
+document.getElementById("v").textContent="oculto";
 const root=document.getElementById("cards");root.innerHTML="";labs.forEach(l=>root.appendChild(card(l)))}
 load();setInterval(load,3000);
 </script></body></html>"""
@@ -450,15 +412,19 @@ def run_lock(action):
     """
     script = ROOT_DIR / "benchmark-lock.sh"
     if not script.is_file():
-        return
+        print(f"[!] Script de lock ausente: {script}")
+        return False
     if IS_WIN and not os.environ.get("SHELL"):
         print(f"[!] auto-{action} precisa de bash; trave/destrave manualmente (ver README).")
-        return
+        return False
     try:
-        subprocess.run(["bash", str(script), action], cwd=str(ROOT_DIR),
-                       env={**os.environ, "HACKERDUMMY_ROOT": str(ROOT_DIR)}, check=False)
+        result = subprocess.run(["bash", str(script), action], cwd=str(ROOT_DIR),
+                                env={**os.environ, "HACKERDUMMY_ROOT": str(ROOT_DIR)},
+                                check=False)
+        return result.returncode == 0
     except Exception as exc:
         print(f"[!] benchmark-lock {action} falhou: {exc}")
+        return False
 
 
 def main():
@@ -468,16 +434,18 @@ def main():
     args = ap.parse_args()
     LOG_DIR.mkdir(exist_ok=True)
     print("[*] Travando gabaritos p/ pentest às cegas (lock)...")
-    run_lock("lock")
+    if not run_lock("lock"):
+        print("[!] Lock falhou; o console e os labs não serão iniciados.")
+        sys.exit(2)
     refresh_inventory()
     labs = serialize()
-    total_vulns = sum(l["vulns"] for l in labs)
 
     def shutdown(*_):
         print("\n[!] Encerrando — derrubando labs...")
         stop_all()
         print("[!] Destravando gabaritos (unlock)...")
-        run_lock("unlock")
+        if not run_lock("unlock"):
+            print("[!] Unlock falhou; verifique o cofre manualmente.")
         print("[+] Todos os labs finalizados.")
         sys.exit(0)
 
@@ -489,7 +457,7 @@ def main():
 
     srv = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"HackerDummy CTF console  ->  http://{args.host}:{args.port}")
-    print(f"  labs: {len(labs)}   vulns catalogadas: {total_vulns}   logs: {LOG_DIR}")
+    print(f"  labs: {len(labs)}   vulns catalogadas: ocultas   logs: {LOG_DIR}")
     print("  Ctrl+C para encerrar (derruba todos os labs).")
     try:
         srv.serve_forever()

@@ -159,10 +159,10 @@ def discover_labs():
 
 
 def discover_mobile():
-    """Mobile labs are STATIC APK trees (no server): a folder with gabarito.json."""
+    """Mobile labs are STATIC APK trees (no server): a folder with app/."""
     if not MOBILE_DIR.exists():
         return []
-    found = [f for f in MOBILE_DIR.iterdir() if f.is_dir() and (f / "gabarito.json").is_file()]
+    found = [f for f in MOBILE_DIR.iterdir() if f.is_dir() and (f / "app").is_dir()]
     return sorted(found, key=lambda f: f.name)
 
 
@@ -241,6 +241,7 @@ def start_labs(use_color, startup_timeout):
         print(paint("[!] Nenhum lab executável encontrado em ./labs", C.RED, use_color))
         sys.exit(1)
     table_header(use_color)
+    all_ready = True
     for position, folder in enumerate(lab_dirs, start=1):
         index = lab_number(folder) or position
         command = resolve_lab_command(folder)
@@ -258,8 +259,13 @@ def start_labs(use_color, startup_timeout):
                 expected_port=target_port_for(folder),
             )
             alive = proc.poll() is None
-            table_row(index, folder.name, "UP" if alive else "DOWN", port or "N/A", use_color)
+            ready = alive and port is not None
+            if alive and not ready:
+                stop_proc(lab)
+            all_ready = all_ready and ready
+            table_row(index, folder.name, "UP" if ready else "DOWN", port or "N/A", use_color)
         except Exception as exc:
+            all_ready = False
             with open(log_file, "ab", buffering=0) as log:
                 log.write(f"ERROR: {exc}\n".encode())
             table_row(index, folder.name, "DOWN", "N/A", use_color)
@@ -269,6 +275,7 @@ def start_labs(use_color, startup_timeout):
         tag = m.group(1) if m else "MOB"
         table_row(tag, f"mobile/{folder.name}", "STATIC", "jadx/apktool", use_color)
     _border("└", "┴", "┘", use_color)
+    return all_ready
 
 
 def run_lock(action, use_color):
@@ -279,16 +286,20 @@ def run_lock(action, use_color):
     """
     script = ROOT_DIR / "benchmark-lock.sh"
     if not script.is_file():
-        return
+        print(paint(f"[!] Script de lock ausente: {script}", C.RED, use_color))
+        return False
     if IS_WIN and not os.environ.get("SHELL"):
         print(paint(f"[!] auto-{action} precisa de bash; trave/destrave manualmente (ver README).",
                     C.YELLOW, use_color))
-        return
+        return False
     try:
-        subprocess.run(["bash", str(script), action], cwd=str(ROOT_DIR),
-                       env={**os.environ, "HACKERDUMMY_ROOT": str(ROOT_DIR)}, check=False)
+        result = subprocess.run(["bash", str(script), action], cwd=str(ROOT_DIR),
+                                env={**os.environ, "HACKERDUMMY_ROOT": str(ROOT_DIR)},
+                                check=False)
+        return result.returncode == 0
     except Exception as exc:
         print(paint(f"[!] benchmark-lock {action} falhou: {exc}", C.RED, use_color))
+        return False
 
 
 def stop_labs(use_color):
@@ -302,7 +313,8 @@ def stop_labs(use_color):
             print(paint("[STOP]", C.YELLOW, use_color), f"LAB {lab['index']} - {lab['folder'].name}")
             stop_proc(lab)
     print("\n" + paint("[!] Destravando gabaritos (unlock)...", C.BOLD + C.YELLOW, use_color))
-    run_lock("unlock", use_color)
+    if not run_lock("unlock", use_color):
+        print(paint("[!] Unlock falhou; verifique o cofre manualmente.", C.RED, use_color))
     print("\n" + paint("[+] Todos os labs foram finalizados.", C.BOLD + C.GREEN, use_color))
     print(paint(f"[+] Logs: {LOG_DIR}", C.DIM + C.WHITE, use_color))
 
@@ -327,9 +339,15 @@ def main():
     print("\033c", end="")
     banner(USE_COLOR)
     print(paint("[*] Travando gabaritos p/ pentest às cegas (lock)...", C.BOLD + C.CYAN, USE_COLOR))
-    run_lock("lock", USE_COLOR)
+    if not run_lock("lock", USE_COLOR):
+        print(paint("[!] Lock falhou; nenhum lab será iniciado.", C.BOLD + C.RED, USE_COLOR))
+        sys.exit(2)
     print()
-    start_labs(USE_COLOR, args.timeout)
+    if not start_labs(USE_COLOR, args.timeout):
+        print(paint("\n[!] Um ou mais labs falharam no startup; encerrando a rodada.",
+                    C.BOLD + C.RED, USE_COLOR))
+        stop_labs(USE_COLOR)
+        sys.exit(3)
     print("\n" + paint("[+] Todos os labs disponíveis foram processados.", C.BOLD + C.GREEN, USE_COLOR))
     print(paint("[+] Gabaritos TRAVADOS. Dê CTRL+C só quando o agente terminar o pentest — o unlock libera o gabarito p/ a Comparação.", C.BOLD + C.YELLOW, USE_COLOR))
     print(paint(f"[+] Logs: {LOG_DIR}\n", C.DIM + C.WHITE, USE_COLOR))
