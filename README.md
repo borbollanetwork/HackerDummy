@@ -228,7 +228,7 @@ pesquisável por um agente de análise estática *e* reconstruível em um APK re
 com `apktool b`. Mesmo contrato dos laboratórios web: um gabarito
 `gabarito.json`, pontuado por **classe + localização**.
 
-A escada sobe de um aplicativo escancarado até um endurecido como um alvo real de
+A escada sobe de um aplicativo escancarado até um blindado como um alvo real de
 banco mobile (RASP, pinning nativo, anti-instrumentação, ofuscação):
 
 | Degrau | Laboratório | Tema |
@@ -237,7 +237,7 @@ banco mobile (RASP, pinning nativo, anti-instrumentação, ofuscação):
 | M02 | [StorageCrypt](labs/mobile/M02-storagecrypt/) ✅ | Armazenamento e criptografia inseguros — prefs legíveis por todos, SQLite e PII em texto plano, AES-ECB com IV estático, MD5, logs sensíveis · **4 vulns, 100% de recall** |
 | M03 | NetForge | Confiança de rede — `X509TrustManager` que aceita tudo, verificador de hostname permissivo, ausência de pinning, ponte JS e acesso a arquivos na WebView |
 | M04 | DeepLinkForge | IPC e deep links — desvio de autenticação por componente exportado, travessia em content provider, redirecionamento por deep link e intent |
-| M05 | RootLite | Entrada em RASP — verificações ingênuas e contornáveis de root, emulador e anti-depuração, `FLAG_SECURE` ausente, tapjacking |
+| M05 | RootLite | RASP básico — verificações ingênuas e contornáveis de root, emulador e anti-depuração, `FLAG_SECURE` ausente, tapjacking |
 | M06 | Hardened | Nível bancário — OkHttp com pinning nativo, anti-Frida e anti-depuração, atestação de integridade, ofuscação pesada guardando a falha real |
 
 > Ferramental de decompilação e build: [`jadx`](https://github.com/skylot/jadx) e
