@@ -35,7 +35,7 @@
       "class": "dir-listing",
       "severity": "medium",
       "route": "/uploads/",
-      "desc": "Listagem de diretórios estilo Apache ('Index of /uploads') expondo invoice_1.pdf, db_dump.sql, users_export.csv.",
+      "desc": "Directory listing estilo Apache ('Index of /uploads') expondo invoice_1.pdf, db_dump.sql, users_export.csv.",
       "exploit": "curl http://127.0.0.1:18801/uploads/  -> 'Index of /uploads' lista arquivos sensíveis",
       "points": 1
     },

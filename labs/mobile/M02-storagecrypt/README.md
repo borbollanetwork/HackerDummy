@@ -1,41 +1,40 @@
 # M02 — StorageCrypt (Android)
 
-Degrau 2 da escada móvel: **armazenamento local inseguro + criptografia quebrada**
-— a camada de dados em repouso de um aplicativo de carteira móvel feita errado.
+Rung 2 of the mobile ladder: **insecure local storage + broken cryptography** —
+the data-at-rest layer of a mobile wallet app done wrong.
 
-## Artefato
+## Artifact
 
-**Árvore do apktool** decompilada em [`app/`](app/). Veja
-[`../MOBILE.md`](../MOBILE.md).
+Decompiled **apktool tree** at [`app/`](app/). See [`../MOBILE.md`](../MOBILE.md).
 
 ```
 app/
   AndroidManifest.xml                       # allowBackup=true
   res/values/strings.xml
-  assets/db_schema.sql                      # SQLite em texto plano: CPF, nome, PAN completo, PIN em MD5
+  assets/db_schema.sql                      # plaintext SQLite: CPF, name, full PAN, MD5 PIN
   smali/com/storagecrypt/app/
-    CryptoUtils.smali                        # AES/ECB + chave embutida no código + IV zerado + MD5
-    StorageManager.smali                     # prefs em texto plano legíveis por todos + vazamento por Log.d
+    CryptoUtils.smali                        # AES/ECB + hardcoded key + zero IV + MD5
+    StorageManager.smali                     # world-readable plaintext prefs + Log.d leak
 ```
 
-> Vulnerável de propósito, só para treino. Os valores de semente (CPF/PAN de
-> teste) são marcadores sem função.
+> Intentionally vulnerable, training only. Seed values (test CPF/PAN) are
+> non-functional placeholders.
 
-## Vulnerabilidades plantadas (4)
+## Planted vulnerabilities (4)
 
-| id | classe | severidade | evidência |
-|----|--------|:----------:|-----------|
-| S1 | `insecure-storage` | high | prefs em texto plano `MODE_WORLD_READABLE` (token, PAN) + PII em SQLite sem criptografia |
-| S2 | `weak-crypto` | high | `AES/ECB/NoPadding` + chave embutida no código + IV estático só de zeros + MD5 sem sal |
-| S3 | `sensitive-log` | medium | `Log.d` vaza o token de sessão e o PAN completo do cartão |
-| S4 | `backup-allowed` | medium | `android:allowBackup="true"` → exfiltração por `adb backup` |
+| id | class | severity | evidence |
+|----|-------|:--------:|----------|
+| S1 | `insecure-storage` | high | `MODE_WORLD_READABLE` plaintext prefs (token, PAN) + unencrypted SQLite PII |
+| S2 | `weak-crypto` | high | `AES/ECB/NoPadding` + hardcoded key + all-zero static IV + unsalted MD5 |
+| S3 | `sensitive-log` | medium | `Log.d` leaks the session token and full card PAN |
+| S4 | `backup-allowed` | medium | `android:allowBackup="true"` → `adb backup` exfiltration |
 
-Detalhes em [`gabarito.json`](gabarito.json).
+Details in [`gabarito.json`](gabarito.json).
 
-## Analisar e pontuar
+## Analyze & score
 
 ```bash
 python harness/score_lab.py \
   --gabarito labs/mobile/M02-storagecrypt/gabarito.json \
-  --findings achados_do_seu_agente.json
+  --findings your_agent_findings.json
 ```

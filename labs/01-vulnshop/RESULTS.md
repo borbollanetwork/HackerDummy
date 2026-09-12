@@ -1,72 +1,68 @@
-# Lab 01 — VulnShop — Resultados
+# Lab 01 — VulnShop — Results
 
-Pontuação da esteira automática de pentest contra as 15 vulnerabilidades
-plantadas no VulnShop. A esteira rodou **às cegas**: o agente de exploração
-recebeu apenas os endpoints descobertos no reconhecimento, nunca o gabarito.
+Scoring the automated pentest pipeline against VulnShop's 15 planted vulns.
+The pipeline ran **blind**: the exploitation agent received only the
+recon-discovered endpoints, never the answer key.
 
-## Método
+## Method
 
-1. **Reconhecimento (scripts determinísticos)** — `passive_audit.py` (cabeçalhos
-   de segurança, cookies, banners) + `content_discovery.py` (descoberta de
-   caminhos/arquivos + emissão de sinal) contra `http://127.0.0.1:18801`.
-2. **Exploração (agente às cegas)** — um agente de pentest web testou ativamente
-   cada endpoint/parâmetro descoberto em busca de injeção, controle de acesso,
-   redirecionamento/SSRF e divulgação de informação, confirmando cada um com uma
-   requisição ao vivo (disciplina de zero falso positivo) e escrevendo um achado
-   por vulnerabilidade confirmada.
-3. **Pontuação** — o `harness/score_lab.py` casou os achados contra o
-   `gabarito.json` por classe + rota.
+1. **Recon (deterministic scripts)** — `passive_audit.py` (security headers,
+   cookies, banners) + `content_discovery.py` (path/file discovery + signal
+   emission) against `http://127.0.0.1:18801`.
+2. **Exploitation (blind agent)** — a web-pentest agent actively tested every
+   discovered endpoint/parameter for injection, access-control, redirect/SSRF,
+   and info-disclosure bugs, confirming each with a live request (zero
+   false-positive discipline) and writing one finding per confirmed vuln.
+3. **Score** — `harness/score_lab.py` matched the findings against
+   `gabarito.json` by class + route.
 
-## Nota
+## Score
 
-| Passada         | Recall        | Precisão            | Notas |
+| Pass            | Recall        | Precision           | Notes |
 |-----------------|---------------|---------------------|-------|
-| Primeira execução | 12/15 (80%)   | 85%                 | 3 falhas — todas bugs de **classificação**, não de detecção |
-| Após correções  | **15/15 (100%)** | **93% (1 bônus, 0 FP)** | todas as plantadas casadas + 1 bônus |
+| First run       | 12/15 (80%)   | 85%                 | 3 misses — all **classifier** bugs, not detection failures |
+| After fixes     | **15/15 (100%)** | **93% (1 bonus, 0 FP)** | all planted vulns matched + 1 bonus |
 
-O único achado "extra" é **clickjacking** — um problema real que a esteira
-levantou além do gabarito (bônus, não falso positivo). A precisão efetiva é 100%.
+The single "extra" finding is **clickjacking** — a real issue the pipeline
+surfaced beyond the answer key (bonus, not a false positive). Effective
+precision is 100%.
 
-## O que a primeira passada deixou passar — e por quê
+## What the first pass missed — and why
 
-O agente às cegas de fato **achou todas as 15 vulnerabilidades** e escreveu
-achados para elas. As três "falhas" foram o motor de relatório **classificando
-errado** achados corretos, que é justamente o tipo de lacuna que esta campanha
-existe para revelar:
+The blind agent actually **found all 15 vulns** and wrote findings for them. The
+three "misses" were the reporting engine **mis-classifying** correct findings,
+which is exactly the kind of gap this campaign is meant to surface:
 
-| Plantada | Causa raiz | Correção |
-|----------|-----------|----------|
-| **V03 backup** (`/backup.sql`) | A evidência do achado (um dump SQL) continha `password`, e o `classify()` lia título **+ evidência**; a regex de `creds` precede `backup`, então foi rerrotulado `creds` e fundido no achado do `.env`. | **Classificação por título primeiro**: classifica pelo título do especialista primeiro, recorrendo ao corpo só quando o título é genérico. |
-| **V07 info-disc** (`/product?id=abc`) | A evidência do achado de erro verboso mostrava um erro de SQL, então a classificação por texto completo bateu em `sqli` e o fundiu. O título sozinho batia em `aspnet-leak` (regex gulosa demais: casava "verbose error" / "stack trace" genéricos). | Classificar por título primeiro **+** apertar `aspnet-leak` para marcadores específicos de ASP.NET **+** ampliar `info-disc` para pegar `verbose error` / `traceback` / `stack trace`. |
-| **V14 open-redirect** (`/redirect?url=`) | **Não havia classe open-redirect** nenhuma — caía em `other`. | Adicionada uma classe `open-redirect` (CWE-601) com o próprio vetor CVSS e ≥3 referências de remediação. |
+| Planted | Root cause | Fix |
+|---------|-----------|-----|
+| **V03 backup** (`/backup.sql`) | The finding's evidence (a SQL dump) contained `password`, and `classify()` read title **+ evidence**; the `creds` regex precedes `backup`, so it was relabeled `creds` and merged into the `.env` finding. | **Title-first classification**: classify on the specialist's title first, fall back to body only when the title is generic. |
+| **V07 info-disc** (`/product?id=abc`) | The verbose-error finding's evidence showed a SQL error, so full-text classify hit `sqli` and merged it away. Its title alone hit `aspnet-leak` (regex too greedy: matched generic "verbose error" / "stack trace"). | Title-first classify **+** tightened `aspnet-leak` to ASP.NET-specific markers **+** broadened `info-disc` to catch `verbose error` / `traceback` / `stack trace`. |
+| **V14 open-redirect** (`/redirect?url=`) | There was **no open-redirect class** at all — it fell through to `other`. | Added an `open-redirect` class (CWE-601) with its own CVSS vector and ≥3 remediation references. |
 
-Todas as correções entraram no motor compartilhado `finding_model.py`
-(`tools/templates/deliverable/dashboard/`) — então beneficiam todo engajamento
-futuro, não só este laboratório.
+All fixes landed in the shared engine `finding_model.py`
+(`tools/templates/deliverable/dashboard/`) — so they benefit every future
+engagement, not just this lab.
 
-## Observações secundárias (registradas, sem afetar o recall)
+## Secondary observations (logged, not recall-affecting)
 
-- **A checagem passiva de cookie é só na raiz.** O `passive_audit.py` sinaliza
-  cookies inseguros na resposta inicial, mas o VulnShop só define o cookie de
-  sessão num `POST /login` bem-sucedido. O agente de exploração pegou o V06
-  (inspecionou o `Set-Cookie` depois de autenticar), então o recall não foi
-  afetado — mas o reconhecimento passivo sozinho perderia cookies definidos só em
-  respostas autenticadas.
-- **Engajamentos congelam o motor.** O andaime do engajamento copia o motor do
-  dashboard (`finding_model.py`, `generate_manifest.py`) para a pasta do
-  engajamento por reprodutibilidade, então correções do motor precisam ser
-  ressincronizadas num engajamento em andamento antes de repontuar.
+- **Passive cookie check is root-only.** `passive_audit.py` flags insecure
+  cookies on the landing response, but VulnShop only sets its session cookie on
+  a successful `POST /login`. The exploitation agent caught V06 (it inspected
+  `Set-Cookie` after authenticating), so recall was unaffected — but passive
+  recon alone would miss cookies set only on authenticated responses.
+- **Engagements snapshot the engine.** Engagement scaffolding copies the
+  dashboard engine (`finding_model.py`, `generate_manifest.py`) into the
+  engagement folder for reproducibility, so engine fixes must be re-synced into
+  an in-flight engagement before re-scoring.
 
-## Pontos fortes confirmados
+## Strong points confirmed
 
-- O reconhecimento levantou de forma confiável toda exposição de arquivo/caminho
-  (`.git`, `.env`, `backup.sql`, listagem de diretório, painel admin) e emitiu os
-  sinais certos.
-- O agente de exploração às cegas confirmou bugs de injeção, controle de acesso,
-  redirecionamento/SSRF e divulgação de informação com evidência ao vivo e **sem
-  falsos positivos** — ele até descartou corretamente SQLi em `/search` (só
-  reflexão) e notou que o valor do cookie de sessão era *previsível/forjável*
-  (`user-<id>-<role>`), uma profundidade extra além do bug plantado.
-- A calibração de severidade + as referências de remediação por classe foram
-  renderizadas corretamente para todas as classes, inclusive a recém-adicionada
-  `open-redirect`.
+- Recon reliably surfaced every file/path exposure (`.git`, `.env`,
+  `backup.sql`, dir-listing, admin panel) and emitted the right signals.
+- The blind exploitation agent confirmed injection, access-control,
+  redirect/SSRF, and info-disclosure bugs with live evidence and **no false
+  positives** — it even correctly ruled out SQLi on `/search` (reflection only)
+  and noted the session cookie value was *predictable/forgeable*
+  (`user-<id>-<role>`), a bonus depth beyond the planted bug.
+- Severity calibration + per-class remediation references rendered correctly
+  for all classes, including the newly added `open-redirect`.

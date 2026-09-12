@@ -1,53 +1,51 @@
 # Lab 05 — SpringVault
 
-> ⚠️ **VULNERÁVEL DE PROPÓSITO — TREINO SOMENTE EM LOCALHOST.** Escuta em `127.0.0.1`.
+> ⚠️ **INTENTIONALLY VULNERABLE — LOCALHOST TRAINING ONLY.** Binds to `127.0.0.1`.
 
-## O que é
+## What it is
 
-O **SpringVault** é uma **imitação fiel, só com a biblioteca padrão, de uma
-aplicação Java/Spring Boot** com os endpoints do **Actuator** expostos — a
-clássica má configuração do mundo real
-(`management.endpoints.web.exposure.include=*`). Não precisa de JVM: reproduz as
-impressões digitais do Spring (a Whitelabel Error Page, o cabeçalho
-`X-Application-Context`, os stack traces Java) e os endpoints de gerenciamento
-perigosos, então uma esteira de **detecção de stack → emissão de sinal do
-actuator → mineração de segredos** pode ser exercitada de ponta a ponta contra
-uma stack "não Python". Roda em `127.0.0.1:18805`.
+**SpringVault** is a **faithful stdlib mock of a Java/Spring Boot app** with its
+**Actuator** endpoints exposed — the classic real-world misconfiguration
+(`management.endpoints.web.exposure.include=*`). No JVM required: it reproduces
+the Spring fingerprints (Whitelabel Error Page, `X-Application-Context` header,
+Java stack traces) and the dangerous management endpoints, so a pipeline's
+**stack detection → actuator signal emission → secret mining** can be exercised
+end to end against a "non-Python" stack. Runs on `127.0.0.1:18805`.
 
-## Como rodar
+## How to run
 
 ```bash
 python app.py        # -> http://127.0.0.1:18805
 ```
 
-`GET /` devolve uma Whitelabel Error Page do Spring (a impressão digital).
-`GET /actuator` lista os endpoints de gerenciamento expostos.
+`GET /` returns a Spring Whitelabel Error Page (the fingerprint). `GET /actuator`
+lists the exposed management endpoints.
 
-## Vulnerabilidades plantadas
+## Planted vulnerabilities
 
-Gabarito: [`gabarito.json`](gabarito.json). 7 problemas, 1 ponto cada.
+Answer key: [`gabarito.json`](gabarito.json). 7 issues, 1 point each.
 
-| ID  | Classe    | Sev      | Rota                 | O quê |
+| ID  | Class     | Sev      | Route                | What |
 |-----|-----------|----------|----------------------|------|
-| SP1 | actuator  | high     | `/actuator`          | Listagem de endpoints de gerenciamento exposta, sem autenticação. |
-| SP2 | actuator  | critical | `/actuator/env`      | Segredos de configuração em texto claro: senha do datasource, segredo do JWT, chaves Stripe/AWS. |
-| SP3 | actuator  | critical | `/actuator/heapdump` | `.hprof` baixável → minere a memória em busca de segredos de runtime (senha do banco, JWT, **token de sessão Bearer do admin**). |
-| SP4 | actuator  | critical | `/jolokia`           | JMX sobre HTTP exposto → leitura/invocação de MBean (logback `reloadByURL` → superfície de RCE por JNDI/deser). |
-| SP5 | actuator  | high     | `/h2-console`        | Console web do H2 alcançável → URL JDBC controlável → RCE por `CREATE ALIAS`/`RUNSCRIPT`. |
-| SP6 | creds     | critical | `/actuator/env`      | O butim de fato: credenciais de produção reaproveitáveis em outros lugares. |
-| SP7 | info-disc | medium   | `*`                  | A página Whitelabel + os stack traces Java vazam o Spring Boot **2.6.6** e pacotes internos. |
+| SP1 | actuator  | high     | `/actuator`          | Management endpoint listing exposed, no auth. |
+| SP2 | actuator  | critical | `/actuator/env`      | Config secrets in cleartext: datasource password, JWT secret, Stripe/AWS keys. |
+| SP3 | actuator  | critical | `/actuator/heapdump` | Downloadable `.hprof` → mine memory for runtime secrets (DB pwd, JWT, **admin Bearer session token**). |
+| SP4 | actuator  | critical | `/jolokia`           | JMX-over-HTTP exposed → MBean read/invoke (logback `reloadByURL` → JNDI/deser RCE surface). |
+| SP5 | actuator  | high     | `/h2-console`        | H2 web console reachable → controllable JDBC URL → `CREATE ALIAS`/`RUNSCRIPT` RCE. |
+| SP6 | creds     | critical | `/actuator/env`      | The actual loot: production credentials reusable elsewhere. |
+| SP7 | info-disc | medium   | `*`                  | Whitelabel page + Java stack traces leak Spring Boot **2.6.6** and internal packages. |
 
-## Roteiro sugerido de ataque
+## Suggested attack walk-through
 
-1. **Impressão digital:** `GET /` → "Whitelabel Error Page" + "Spring Boot 2.6.6" ⇒ Java/Spring.
-2. **Enumerar gerenciamento:** `GET /actuator` → env, heapdump, mappings, …
-3. **Roubar configuração:** `GET /actuator/env` → senha do banco, segredo do JWT, chaves de API.
-4. **Minerar memória:** `GET /actuator/heapdump` → grep nos bytes → token de sessão do admin.
-5. **Superfícies de RCE:** `/jolokia` (JMX→reloadByURL) e `/h2-console` (URL JDBC).
+1. **Fingerprint:** `GET /` → "Whitelabel Error Page" + "Spring Boot 2.6.6" ⇒ Java/Spring.
+2. **Enumerate management:** `GET /actuator` → env, heapdump, mappings, …
+3. **Steal config:** `GET /actuator/env` → DB password, JWT secret, API keys.
+4. **Mine memory:** `GET /actuator/heapdump` → grep the bytes → admin session token.
+5. **RCE surfaces:** `/jolokia` (JMX→reloadByURL) and `/h2-console` (JDBC URL).
 
-## Notas / projeto
+## Notes / design
 
-- Esta imitação existe para testar **detecção de stack + mineração de actuator**
-  numa stack não Python sem uma JVM. A esteira detecta `stack=java` pelo corpo da
-  Whitelabel e sonda automaticamente os caminhos `/actuator/*` + `/jolokia`.
-- Valores com cara de segredo (Stripe/AWS) são marcadores sem função de propósito.
+- This mock exists to test **stack detection + actuator mining** on a non-Python
+  stack without a JVM. The pipeline detects `stack=java` from the Whitelabel body
+  and auto-probes the `/actuator/*` + `/jolokia` paths.
+- Secret-shaped values (Stripe/AWS) are intentionally non-functional placeholders.

@@ -1,50 +1,48 @@
-# Lab 18 — JavaForge — Resultados
+# Lab 18 — JavaForge — Results
 
-Uma aplicação Java / Apache Tomcat (imitação em Python só com a biblioteca padrão)
-centrada em **desserialização nativa do Java** — a aplicação devolve e aceita um
-objeto serializado em base64 `rO0AB...` no cookie `JSESSIONOBJ` e no `/api/restore`,
-então uma cadeia de gadgets do ysoserial alcança RCE. Mais credenciais padrão do
-Tomcat-manager, stack traces Java verbosos e um banner de Tomcat/Java em fim de vida.
+A Java / Apache Tomcat app (stdlib-Python mock) centred on **native Java
+deserialization** — the app round-trips a base64 `rO0AB...` serialized object in the
+`JSESSIONOBJ` cookie and accepts one at `/api/restore`, so a ysoserial gadget chain
+reaches RCE. Plus default Tomcat-manager creds, verbose Java stack traces, and an
+EOL Tomcat/Java banner.
 
-## Nota
+## Score
 
-| Passada | Recall | Precisão | Notas |
-|---------|--------|----------|-------|
-| Linha de base | **3/5 (60%)** | 43% | achado de credenciais padrão do Tomcat classificado `rce`; achado de versão/fim de vida classificado `eol` (o gabarito dizia `version`) |
-| Após correção | **5/5 (100%)** | — | os extras são bônus reais, zero falso positivo |
+| Pass | Recall | Precision | Notes |
+|------|--------|-----------|-------|
+| Baseline | **3/5 (60%)** | 43% | Tomcat default-creds finding classified `rce`; version/EOL finding classified `eol` (gabarito said `version`) |
+| After fix | **5/5 (100%)** | — | extras are real bonus, zero false positives |
 
-O especialista Java às cegas achou tudo: reconheceu o cookie de sessão `rO0AB` como um
-objeto serializado do Java, enviou um gadget CommonsCollections6 tanto para
-`/api/whoami` (cookie) quanto para `/api/restore` (corpo) confirmando a capacidade de
-RCE, usou as credenciais padrão do Tomcat-manager, disparou o stack trace Java e
-sinalizou o Tomcat 7.0.42 / Java 1.8 em fim de vida com as CVEs de desserialização
-dele.
+The blind Java specialist found everything: it recognised the `rO0AB` session cookie
+as a Java serialized object, sent a CommonsCollections6 gadget to both
+`/api/whoami` (cookie) and `/api/restore` (body) confirming RCE-capable, used the
+default Tomcat-manager creds, triggered the Java stack trace, and flagged the EOL
+Tomcat 7.0.42 / Java 1.8 with its deserialization CVEs.
 
-## A lacuna que este laboratório revelou
+## The gap this lab exposed
 
-**`rce` precisa ser a ÚLTIMA classe de impacto (a generalização concluída).** O achado
-"Tomcat Default Credentials → WAR deploy → RCE" era roubado por `rce` porque o título
-menciona RCE — mas a causa raiz dele é `default-creds`. É a mesma regra de
-causa-raiz-vs-impacto do upload/lfi/deser antes de rce; o AspNetVault (Lab 13) moveu
-`rce` para depois das classes de *injeção*, mas as classes de acesso/configuração
-(default-creds, exposed-service, actuator, admin-panel) ainda estavam abaixo dele.
-`rce` movido para ser a **última classe de impacto** (depois de toda causa raiz
-específica que pode levar a RCE). Agora "Tomcat default creds → RCE" → `default-creds`,
-"exposed Redis → RCE" → `exposed-service`, "actuator → RCE" → `actuator`, enquanto "OS
-Command Injection" ainda → `rce`. Sem regressão nos 18 labs.
+**`rce` must be the LAST impact class (the generalisation completed).** The "Tomcat
+Default Credentials → WAR deploy → RCE" finding was stolen by `rce` because the
+title mentions RCE — but its root cause is `default-creds`. This is the same
+root-cause-vs-impact rule as upload/lfi/deser before rce; AspNetVault (Lab 13) moved
+`rce` after the *injection* classes, but the access/config classes (default-creds,
+exposed-service, actuator, admin-panel) were still below it. Moved `rce` to be the
+**last impact class** (after every specific root cause that can lead to RCE). Now
+"Tomcat default creds → RCE" → `default-creds`, "exposed Redis → RCE" →
+`exposed-service`, "actuator → RCE" → `actuator`, while "OS Command Injection" still
+→ `rce`. No regression across all 18 labs.
 
-Também: a classe do gabarito de M4 foi corrigida de `version` → `eol` — o achado é
-fundamentalmente sobre uma stack Tomcat/Java em fim de vida (o banner é como se
-detecta).
+Also: the M4 answer-key class was corrected `version` → `eol` — the finding is
+fundamentally about an end-of-life Tomcat/Java stack (the banner is how you detect it).
 
-## Nota do laboratório
+## Lab note
 
-Isto é uma imitação em Python da superfície Java. Nada de Java é
-desserializado/executado — o endpoint reconhece o magic do stream `AC ED 00 05` e uma
-cadeia de gadgets do ysoserial e reporta como capaz de RCE sem rodar nada. As strings
-com cara de segredo são marcadores sem função.
+This is a Python mock of the Java surface. Nothing Java is deserialized/executed —
+the endpoint recognises the `AC ED 00 05` stream magic and a ysoserial gadget chain
+and reports it as RCE-capable without running anything. Secret-shaped strings are
+non-functional placeholders.
 
-## Rodar
+## Run it
 
 ```bash
 python labs/18-javaforge/app.py        # -> http://127.0.0.1:18818

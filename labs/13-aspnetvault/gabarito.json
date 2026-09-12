@@ -8,7 +8,7 @@
       "class": "web-config",
       "severity": "critical",
       "route": "/web.config",
-      "desc": "web.config exposto: o GET /web.config devolve a configuração completa, divulgando a connectionString do SQL (com a senha do sa), as chaves validationKey e decryptionKey do <machineKey> (que permitem forjar ViewState assinado e cookies de autenticação), enableViewStateMac=false e customErrors=Off / debug=true.",
+      "desc": "Exposed web.config: GET /web.config returns the full configuration, disclosing the SQL connectionString (sa password), the <machineKey> validationKey/decryptionKey (lets an attacker forge signed ViewState and auth cookies), enableViewStateMac=false, and customErrors=Off / debug=true.",
       "exploit": "GET /web.config -> connectionStrings password, machineKey validationKey+decryptionKey, enableViewStateMac=false.",
       "points": 1
     },
@@ -17,7 +17,7 @@
       "class": "deserialization",
       "severity": "critical",
       "route": "/default.aspx",
-      "desc": "Desserialização de ViewState -> RCE: o __VIEWSTATE do Default.aspx não é assinado (enableViewStateMac=false, confirmado pelo web.config em D1) nem criptografado, então um ViewState alterado ou forjado é desserializado no servidor sem validação de MAC. Um gadget de ViewState (por exemplo ObjectStateFormatter / LosFormatter do ysoserial.net) alcança execução remota de código. A machineKey vazada em D1 também permite forjar um ViewState assinado válido mesmo onde o MAC está ligado.",
+      "desc": "ViewState deserialization -> RCE: __VIEWSTATE on Default.aspx is unsigned (enableViewStateMac=false, confirmed by web.config D1) and not encrypted, so a modified/forged ViewState is deserialized server-side without MAC validation. A ViewState gadget (e.g. ysoserial.net ObjectStateFormatter / LosFormatter) achieves remote code execution. The leaked machineKey (D1) also lets an attacker forge a valid signed ViewState even where MAC is on.",
       "exploit": "POST /Default.aspx with a tampered __VIEWSTATE -> accepted without 'Validation of viewstate MAC failed' (MAC off). A gadget __VIEWSTATE is recognised as RCE-capable (deserialization executes it).",
       "points": 1
     },
@@ -26,7 +26,7 @@
       "class": "info-disc",
       "severity": "high",
       "route": "/trace.axd",
-      "desc": "Visualizador de trace do ASP.NET exposto (trace habilitado, localOnly=false): o GET /trace.axd divulga as requisições recentes, identificadores de sessão, variáveis de servidor (caminhos físicos C:\\inetpub\\..., conta de serviço em AUTH_USER/LOGON_USER) e detalhes das requisições para qualquer usuário remoto.",
+      "desc": "ASP.NET trace viewer exposed (trace enabled, localOnly=false): GET /trace.axd discloses recent requests, session ids, server variables (physical paths C:\\inetpub\\..., AUTH_USER/LOGON_USER service account), and request details to any remote user.",
       "exploit": "GET /trace.axd -> application trace with server variables, session id, and physical paths.",
       "points": 1
     },
@@ -35,7 +35,7 @@
       "class": "version",
       "severity": "low",
       "route": "*",
-      "desc": "Divulgação da versão do software e do framework: toda resposta envia Server: Microsoft-IIS/7.5, X-Powered-By: ASP.NET e X-AspNet-Version: 2.0.50727 (impressão digital de .NET 2.0 / IIS 7.5 fora de suporte), o que facilita a exploração direcionada.",
+      "desc": "Software/framework version disclosure: every response sends Server: Microsoft-IIS/7.5, X-Powered-By: ASP.NET, and X-AspNet-Version: 2.0.50727 (an out-of-support .NET 2.0 / IIS 7.5 fingerprint), easing targeted exploitation.",
       "exploit": "curl -I / -> Server + X-AspNet-Version + X-Powered-By banners.",
       "points": 1
     },
@@ -44,7 +44,7 @@
       "class": "headers",
       "severity": "low",
       "route": "*",
-      "desc": "Cabeçalhos de segurança ausentes em todas as respostas: sem Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options nem HSTS.",
+      "desc": "Missing security headers on all responses: no Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options, or HSTS.",
       "exploit": "curl -I any endpoint -> none of CSP/XFO/XCTO/HSTS present.",
       "points": 1
     }

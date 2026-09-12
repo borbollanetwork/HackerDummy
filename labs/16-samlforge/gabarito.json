@@ -8,7 +8,7 @@
       "class": "auth",
       "severity": "critical",
       "route": "/sso/acs",
-      "desc": "Desvio de autenticação SAML: o Assertion Consumer Service (/sso/acs) NÃO verifica a assinatura XML da asserção, então um SAMLResponse adulterado ou sem assinatura é aceito como confiável. Capture a asserção de exemplo em /sso/login, altere o NameID e/ou o AttributeValue de papel para admin (ou remova o <ds:Signature>), reenvie, e você está autenticado como aquela identidade com acesso de administrador.",
+      "desc": "SAML authentication bypass: the Assertion Consumer Service (/sso/acs) does NOT verify the assertion's XML signature, so a tampered or unsigned SAMLResponse is trusted. Capture the sample assertion from /sso/login, change the NameID and/or the role AttributeValue to admin (or strip the <ds:Signature>), replay it, and you are authenticated as that identity with admin access.",
       "exploit": "GET /sso/login -> base64 SAMLResponse. Decode, set NameID=admin and role=admin, re-encode, POST to /sso/acs -> {authenticated:true, admin_access:true} despite signature_verified:false.",
       "points": 1
     },
@@ -17,7 +17,7 @@
       "class": "xxe",
       "severity": "high",
       "route": "/sso/acs",
-      "desc": "XXE via SAMLResponse: o provedor de serviço interpreta o XML da asserção com entidades gerais externas HABILITADAS, então um SAMLResponse que carrega um DOCTYPE com entidade externa lê arquivos arbitrários do servidor (a entidade é refletida de volta na resposta pelo NameID ou pelo AttributeValue).",
+      "desc": "XXE via SAMLResponse: the SP parses the assertion XML with external general entities ENABLED, so a SAMLResponse carrying a DOCTYPE with an external entity reads arbitrary server files (the entity is reflected via the NameID/AttributeValue back in the response).",
       "exploit": "POST /sso/acs a SAMLResponse with <!DOCTYPE x [<!ENTITY xxe SYSTEM \"file:///.../sp-private.txt\">]> and NameID=&xxe; -> the file content is returned as the authenticated NameID.",
       "points": 1
     },
@@ -26,7 +26,7 @@
       "class": "open-redirect",
       "severity": "medium",
       "route": "/sso/acs",
-      "desc": "Open redirect via RelayState: após consumir a assertion, o /sso/acs redireciona (302 Location) para o RelayState fornecido pelo atacante sem lista de permissões / validação de mesma origem.",
+      "desc": "Open redirect via RelayState: after consuming the assertion, /sso/acs redirects (302 Location) to the attacker-supplied RelayState with no allow-list / same-origin validation.",
       "exploit": "POST /sso/acs with a valid SAMLResponse and RelayState=https://evil.example/ -> 302 Location: https://evil.example/.",
       "points": 1
     },
@@ -35,7 +35,7 @@
       "class": "info-disc",
       "severity": "medium",
       "route": "/sso/acs",
-      "desc": "Erros verbosos: um SAMLResponse malformado (base64 inválido ou XML quebrado) dispara um traceback completo do Python no corpo da resposta, divulgando caminhos do código-fonte e detalhes internos.",
+      "desc": "Verbose errors: a malformed SAMLResponse (bad base64 / broken XML) triggers a full Python traceback in the response body, disclosing source paths and internals.",
       "exploit": "POST /sso/acs with SAMLResponse=not-valid-xml -> 500 with full traceback.",
       "points": 1
     },
@@ -44,7 +44,7 @@
       "class": "headers",
       "severity": "low",
       "route": "*",
-      "desc": "Cabeçalhos de segurança ausentes em todas as respostas: sem Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options nem HSTS.",
+      "desc": "Missing security headers on all responses: no Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options, or HSTS.",
       "exploit": "curl -I any endpoint -> none of CSP/XFO/XCTO/HSTS present.",
       "points": 1
     }

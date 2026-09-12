@@ -1,50 +1,46 @@
-# Lab 08 — TrustEdge — Resultados
+# Lab 08 — TrustEdge — Results
 
-Pontuação do agente de referência contra 7 vulnerabilidades de **fronteira de
-confiança** plantadas — bugs que vêm de confiar em cabeçalhos/parâmetros de
-requisição controlados pelo atacante (CORS, Host, X-Forwarded-Host, CRLF). Rodou
-**às cegas**.
+Scoring the reference agent against 7 planted **trust-boundary** vulns — bugs
+that come from trusting attacker-controlled request headers/params (CORS, Host,
+X-Forwarded-Host, CRLF). Ran **blind**.
 
-## Nota
+## Score
 
-| Passada     | Recall        | Precisão | Notas |
-|-------------|---------------|----------|-------|
-| Linha de base | **1/7 (14%)** | 17%     | só `headers` tinha classe |
-| Após correção | **7/7 (100%)**| 100%    | +4 classes de fronteira de confiança |
+| Pass        | Recall        | Precision | Notes |
+|-------------|---------------|-----------|-------|
+| Baseline    | **1/7 (14%)** | 17%       | only `headers` had a class |
+| After fix   | **7/7 (100%)**| 100%      | +4 trust-boundary classes |
 
-O agente às cegas confirmou todos os 7 com evidência bruta de cabeçalho (CORS
-refletindo tanto `evil.example` quanto `Origin: null` com credenciais,
-envenenamento de redefinição por cabeçalho Host, X-Forwarded-Host refletido +
-cacheável e uma divisão de resposta por CRLF real injetando `Set-Cookie:
-admin=1`). Zero falso positivo.
+The blind agent confirmed all 7 with raw header evidence (CORS reflecting both
+`evil.example` and `Origin: null` with credentials, Host-header reset poisoning,
+X-Forwarded-Host reflected + cacheable, and a real CRLF response split injecting
+`Set-Cookie: admin=1`). Zero false positives.
 
-## A lacuna que este laboratório revelou
+## The gap this lab exposed
 
-Estes são problemas clássicos, mas facilmente perdidos, de **confiança em
-cabeçalho**, e o motor não tinha vocabulário para nenhum deles — os achados se
-espalharam para `auth` (o envenenamento de redefinição, por "password reset"),
-`creds` (CORS, por "credentials"), `session` e `other`. Adicionadas:
+These are classic but easily-missed **header-trust** issues, and the engine had
+no vocabulary for any of them — the findings scattered into `auth` (the reset
+poisoning, via "password reset"), `creds` (CORS, via "credentials"), `session`,
+and `other`. Added:
 
-| Classe | CWE | Pega |
-|--------|-----|------|
-| `cors-misconfig` | 942 | `Access-Control-Allow-Origin` refletido/`null`/curinga (+ credenciais) |
-| `host-header-injection` | 644 | Host / X-Forwarded-Host confiado em links/redirecionamentos (envenenamento de redefinição, tomada de conta) |
-| `crlf` | 113 | CRLF num valor de cabeçalho → divisão de resposta HTTP / injeção de cabeçalho |
-| `cache-poisoning` | 349 | cabeçalho fora da chave refletido numa resposta cacheável |
+| Class | CWE | Catches |
+|-------|-----|---------|
+| `cors-misconfig` | 942 | reflected/`null`/wildcard `Access-Control-Allow-Origin` (+ credentials) |
+| `host-header-injection` | 644 | Host / X-Forwarded-Host trusted into links/redirects (reset poisoning, ATO) |
+| `crlf` | 113 | CRLF in a header value → HTTP response splitting / header injection |
+| `cache-poisoning` | 349 | unkeyed header reflected into a cacheable response |
 
-A ordem importou: `cors-misconfig` teve de ficar **antes** de `creds` (o título
-diz "credentials") e `host-header-injection` **antes** de `auth` (o título diz
-"password reset"), para a classe específica vencer. Tanto o `finding_model` do
-plugin quanto o `harness/classify.py` autônomo do benchmark foram atualizados em
-sincronia.
+Ordering mattered: `cors-misconfig` had to sit **before** `creds` (its title says
+"credentials") and `host-header-injection` **before** `auth` (its title says
+"password reset"), so the specific class wins. Both the plugin's `finding_model`
+and the benchmark's standalone `harness/classify.py` were updated in lockstep.
 
-Repontuação: **7/7, 100%**. Regressão: labs 01-07 todos inalterados.
+Re-score: **7/7, 100%**. Regression: Labs 01-07 all unchanged.
 
-## Pontos fortes confirmados
+## Strong points confirmed
 
-- O agente às cegas leu os cabeçalhos de resposta com cuidado (esses bugs são
-  invisíveis no corpo) e provou a divisão por CRLF no nível dos bytes brutos —
-  exatamente o rigor que esses problemas sutis exigem.
-- Ele separou corretamente os dois impactos do X-Forwarded-Host (confiança no
-  cabeçalho Host vs a variante cacheável de envenenamento de cache) em achados
-  distintos.
+- The blind agent read response headers carefully (these bugs are invisible in
+  the body) and proved the CRLF split at the raw-bytes level — exactly the rigor
+  these subtle issues need.
+- It correctly separated the two X-Forwarded-Host impacts (host-header trust vs
+  the cacheable cache-poisoning variant) into distinct findings.

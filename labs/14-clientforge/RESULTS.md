@@ -1,62 +1,58 @@
-# Lab 14 — ClientForge — Resultados
+# Lab 14 — ClientForge — Results
 
-O primeiro lab de **lado do cliente** — toda a superfície de ataque no navegador que
-os 13 labs anteriores (focados no servidor) nunca tocaram. Todo bug vive no HTML/JS
-que o servidor entrega e que executa no navegador da vítima, então é achado por
-**análise fonte → sink do código servido**, exatamente como XSS de DOM, poluição de
-protótipo, redirecionamento aberto no DOM e segredos no JS são descobertos num
-engajamento real.
+The first **client-side** lab — the entire browser-side attack surface that the
+previous 13 (server-focused) labs never touched. Every bug lives in the HTML/JS the
+server hands out and executes in the victim's browser, so it's found by **source →
+sink analysis of the served code**, exactly how DOM XSS, prototype pollution, DOM
+open-redirect and secrets-in-JS are discovered in a real engagement.
 
-## Método
+## Method
 
-O plugin rodou a esteira completa; o agente de exploração rodou **às cegas** e (como
-essas vulnerabilidades não aparecem nas respostas HTTP puras) as achou buscando toda
-página + `<script>` e traçando estaticamente o fluxo de dados. Ele leu
-`/search.html`, `/profile.html`, `/go.html` e `/static/app.js` e identificou cada
-fonte→sink.
+The plugin ran the full pipeline; the exploitation agent ran **blind** and (since
+these vulns don't surface over plain HTTP responses) found them by fetching every
+page + `<script>` and statically tracing data flow. It read `/search.html`,
+`/profile.html`, `/go.html`, and `/static/app.js` and identified each source→sink.
 
-## Nota
+## Score
 
-| Passada | Recall | Precisão | Notas |
-|---------|--------|----------|-------|
-| Linha de base | **3/5 (60%)** | 50% | XSS de DOM classificado `other`; poluição de protótipo sem classe (caiu em `2fa-bypass` pelo texto do corpo) |
-| Após correção | **5/5 (100%)** | 83% | o extra (clickjacking) é bônus real, zero falso positivo |
+| Pass | Recall | Precision | Notes |
+|------|--------|-----------|-------|
+| Baseline | **3/5 (60%)** | 50% | DOM XSS classified `other`; prototype pollution had no class (fell to `2fa-bypass` via body text) |
+| After fix | **5/5 (100%)** | 83% | extra (clickjacking) is real bonus, zero false positives |
 
-O agente às cegas **detectou os cinco bugs de lado do cliente** lendo o JS. As duas
-falhas foram de classificação — inclusive uma classe totalmente nova.
+The blind agent **detected all five client-side bugs** by reading the JS. Both
+misses were classification — including one brand-new class.
 
-## As lacunas que este laboratório revelou
+## The gaps this lab exposed
 
-**1. Nova classe: `prototype-pollution` (CWE-1321).** O agente achou o `merge()`
-recursivo sem proteção e o fluxo `?prefs={"__proto__":...}`, mas nem o
-`finding_model.py` nem o `classify.py` do benchmark tinham uma classe de poluição de
-protótipo, então caiu em `other` e depois em `2fa-bypass` (o texto de impacto
-mencionava "2FA bypass" via o gadget, e o fallback pelo corpo casou). Classe
-adicionada aos dois, com CWE-1321 + referências OWASP/PortSwigger.
+**1. New class: `prototype-pollution` (CWE-1321).** The agent found the unguarded
+recursive `merge()` and the `?prefs={"__proto__":...}` flow, but neither
+`finding_model.py` nor the benchmark `classify.py` had a prototype-pollution class,
+so it fell through to `other` and then to `2fa-bypass` (its impact text mentioned
+"2FA bypass" via the gadget, and body-fallback matched). Added the class to both,
+with CWE-1321 + OWASP/PortSwigger references.
 
-**2. `xss` não reconhecia XSS de DOM (divergência finding_model ↔ classify.py).** A
-regex de `xss` do `finding_model` era `reflect.*xss | cross-site script |
-reflected.*script` — **não tinha `\bxss\b` nem vocabulário de DOM**, então "DOM-Based
-XSS" classificava como `other` (enquanto o `classify.py` do benchmark já o casava por
-`\bxss\b`). Adicionado `dom.?based.?xss | dom.?xss` ao `finding_model`.
+**2. `xss` didn't recognise DOM XSS (finding_model ↔ classify.py divergence).**
+`finding_model`'s `xss` regex was `reflect.*xss | cross-site script | reflected.*script`
+— it had **no `\bxss\b` and no DOM vocabulary**, so "DOM-Based XSS" classified as
+`other` (while the benchmark `classify.py` already matched it via `\bxss\b`). Added
+`dom.?based.?xss | dom.?xss` to `finding_model`.
 
-**Uma armadilha evitada:** a correção óbvia (adicionar `\bxss\b` puro) *regredia* o
-achado de redirecionamento aberto — o título dele era "DOM-Based Open Redirect
-(escalation to **XSS** via `javascript:`)", e um `\bxss\b` guloso o roubava para o
-balde `xss`. Então o casamento de XSS é de propósito restrito a qualificadores
-DOM/refletido/cross-site, nunca um substring "XSS" puro — o redirecionamento aberto
-(causa raiz) mantém a classe enquanto o achado de XSS de DOM ainda casa. Verificado
-nos 14 labs; sem regressão.
+**A trap avoided:** the obvious fix (add bare `\bxss\b`) *regressed* the open-redirect
+finding — its title was "DOM-Based Open Redirect (escalation to **XSS** via
+`javascript:`)", and a greedy `\bxss\b` stole it into the `xss` bucket. So the XSS
+match is intentionally restricted to DOM/reflected/cross-site qualifiers, never a
+bare "XSS" substring — the open-redirect (root cause) keeps its class while the DOM
+XSS finding still matches. Verified across all 14 labs; no regression.
 
-## Nota do laboratório
+## Lab note
 
-HTML/JS estático, servido por Python só com a biblioteca padrão. Os bugs são sinks
-reais de lado do cliente (`location.hash`→`innerHTML`, `merge()` sem proteção de
-`?prefs=`, `location.href`←`?next=`, chave embutida em `app.js`); executam num
-navegador, por isso a detecção é por revisão de código-fonte. As strings com cara de
-segredo são marcadores sem função.
+Static, stdlib-Python-served HTML/JS. The bugs are real client-side sinks
+(`location.hash`→`innerHTML`, unguarded `merge()` of `?prefs=`, `location.href`←
+`?next=`, hardcoded key in `app.js`); they execute in a browser, which is why
+detection is source-review based. Secret-shaped strings are non-functional placeholders.
 
-## Rodar
+## Run it
 
 ```bash
 python labs/14-clientforge/app.py        # -> http://127.0.0.1:18814

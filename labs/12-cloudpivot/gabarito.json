@@ -8,7 +8,7 @@
       "class": "ssrf",
       "severity": "high",
       "route": "/fetch",
-      "desc": "Falsificação de requisição no lado do servidor: o GET /fetch?url= (e o /preview?url=) busca uma URL arbitrária a partir do servidor. A lista de bloqueio só barra os literais 127.0.0.1 e localhost, então hosts internos da nuvem (169.254.169.254, instance-data) e codificações alternativas passam. Esta é a ENTRADA da cadeia.",
+      "desc": "Server-Side Request Forgery: GET /fetch?url= (and /preview?url=) fetches an arbitrary URL server-side. The blocklist only blocks literal 127.0.0.1/localhost, so cloud-internal hosts (169.254.169.254, instance-data) and alternate encodings slip through. This is the ENTRY of the chain.",
       "exploit": "GET /fetch?url=http://example.com -> server-side request issued. GET /fetch?url=http://169.254.169.254/latest/meta-data/ -> reaches cloud metadata (see K2).",
       "points": 1
     },
@@ -17,7 +17,7 @@
       "class": "creds",
       "severity": "critical",
       "route": "*",
-      "desc": "Divulgação das credenciais da role da instância via SSRF (passo 2 da cadeia): apontando o SSRF para o endpoint do IMDS em http://169.254.169.254/latest/meta-data/iam/security-credentials/<role> obtêm-se AccessKeyId, SecretAccessKey e Token de sessão válidos. Só é alcançável explorando K1 — o IMDS não é acessível diretamente pelo atacante.",
+      "desc": "Cloud instance-role credential disclosure via the SSRF (chain step 2): pivoting the SSRF to the IMDS endpoint http://169.254.169.254/latest/meta-data/iam/security-credentials/<role> returns live AccessKeyId / SecretAccessKey / session Token. Only reachable by exploiting K1 — IMDS is not directly reachable by the attacker.",
       "exploit": "GET /fetch?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/cloudpivot-app-role -> JSON with AccessKeyId/SecretAccessKey/Token.",
       "points": 1
     },
@@ -26,7 +26,7 @@
       "class": "rce",
       "severity": "critical",
       "route": "/internal/admin",
-      "desc": "Injeção de comando do sistema operacional -> RCE (passo 3 da cadeia): o /internal/admin?cmd= executa um comando de manutenção, mas exige uma credencial de instância válida — ele confia no Token de sessão do IMDS vazado em K2 como Bearer. Só é alcançável após encadear K1->K2 para obter o Token. (Seguro para laboratório: só um canário somente leitura é de fato executado.)",
+      "desc": "OS command injection -> RCE (chain step 3): /internal/admin?cmd= executes a maintenance command but is gated by a valid instance credential — it trusts the IMDS session Token leaked in K2 as a Bearer. Only reachable after chaining K1->K2 to obtain the Token. (Lab-safe: only a read-only canary actually runs.)",
       "exploit": "GET /internal/admin?cmd=whoami with Authorization: Bearer <Token-from-K2> -> command output (RCE). Non-canary commands are confirmed injectable but intercepted.",
       "points": 1
     },
@@ -35,7 +35,7 @@
       "class": "info-disc",
       "severity": "medium",
       "route": "*",
-      "desc": "Configuração insegura em toda a aplicação: modo de depuração ligado -> entrada malformada devolve um traceback completo do Python no corpo da resposta, vazando caminhos do código-fonte e detalhes internos.",
+      "desc": "Security misconfiguration (app-wide): debug mode on -> malformed input returns a full Python traceback in the response body, leaking source paths and internals.",
       "exploit": "GET /fetch?url=http://a:notaport/ -> ValueError stack trace (full traceback) in the response.",
       "points": 1
     },
@@ -44,7 +44,7 @@
       "class": "headers",
       "severity": "low",
       "route": "*",
-      "desc": "Cabeçalhos de segurança ausentes em todas as respostas: sem Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options nem HSTS.",
+      "desc": "Missing security headers on all responses: no Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options, or HSTS.",
       "exploit": "curl -I any endpoint -> none of CSP/XFO/XCTO/HSTS present.",
       "points": 1
     }

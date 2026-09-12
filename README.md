@@ -88,7 +88,7 @@ Você recebe recall, precisão, exatamente as vulnerabilidades **NÃO ENCONTRADA
 real). Exemplo pronto:
 [`examples/example-findings-vulnshop.json`](examples/example-findings-vulnshop.json).
 
-## Rodar a linha inteira
+## Rodar a suíte inteira
 
 Dois executores sem dependências sobem todos os laboratórios HTTP de uma vez —
 uma porta por laboratório.
@@ -106,11 +106,11 @@ padrão** — sem Flask, sem pip install. O console web mostra cada laboratório
 um cartão com status ao vivo, porta do alvo, quantidade de vulnerabilidades
 plantadas e superfície de ataque — **uma porta, um laboratório.**
 
-Os **laboratórios móveis** também aparecem nos dois executores, marcados como
+Os **laboratórios mobile** também aparecem nos dois executores, marcados como
 **STATIC** (não há servidor para subir): a tabela do terminal os lista com um
 marcador `jadx/apktool`, e o console web os desenha como cartões STATIC
 (quantidade de vulnerabilidades e superfície, sem iniciar ou parar). Analise-os
-offline — veja [a trilha móvel](#os-laboratórios-móveis-android--nova-trilha).
+offline — veja [a trilha mobile](#os-laboratórios-mobile-android--nova-trilha).
 
 ## Sem operador: rodar o benchmark inteiro com um prompt
 
@@ -118,7 +118,7 @@ Não quer conduzir cada laboratório na mão? O
 [`bench-prompt.txt`](bench-prompt.txt) é um prompt pronto e agnóstico de
 fornecedor que faz um agente atacar **todos** os laboratórios às cegas, escrever
 os achados, comparar contra os gabaritos e pontuar a si mesmo — laboratórios web
-*e* os móveis estáticos, em uma única execução.
+*e* os mobile estáticos, em uma única execução.
 
 ```bash
 # 1. suba os alvos — isso TRAVA os gabaritos automaticamente (deixe rodando)
@@ -191,7 +191,7 @@ de vulnerabilidades plantadas no gabarito daquele laboratório.
 | 04 | [ShopAPI](labs/04-shopapi/) | OWASP API Top 10 — BOLA, BFLA, atribuição em massa, exposição excessiva de dados, JWT, limite de taxa, SSRF, erros verbosos | 9 |
 | 05 | [SpringVault](labs/05-springvault/) | Java / Spring Boot Actuator — mineração de `/env` e `/heapdump`, Jolokia, console H2, credenciais em texto claro | 7 |
 | 06 | [OpenServices](labs/06-openservices/) | Infraestrutura — Redis, Elastic, Mongo, CouchDB, Docker, Memcached e MySQL sem autenticação, mais credenciais padrão | 8 |
-| 07 | [GraphVault](labs/07-graphvault/) | GraphQL — introspecção, BOLA, exposição excessiva de dados, BFLA, batching, negação de serviço por profundidade, SQLi, sugestão de campos | 8 |
+| 07 | [GraphVault](labs/07-graphvault/) | GraphQL — introspecção, BOLA, exposição excessiva de dados, BFLA, batching, DoS por profundidade, SQLi, sugestão de campos | 8 |
 | 08 | [TrustEdge](labs/08-trustedge/) | Fronteira de confiança e cabeçalhos — reflexão de CORS, injeção de cabeçalho Host, X-Forwarded-Host, divisão por CRLF, envenenamento de cache | 7 |
 | 09 | [InjectArena](labs/09-injectarena/) | Injeção além de SQL — operador NoSQL, LDAP, XPath, SSI, CSV e fórmula | 5 |
 | 10 | [UploadForge](labs/10-uploadforge/) | Envio de arquivos — envio irrestrito → webshell → RCE, cadeia de credenciais padrão, leitura por travessia, XSS armazenado em SVG, IDOR | 7 |
@@ -204,7 +204,7 @@ de vulnerabilidades plantadas no gabarito daquele laboratório.
 | 17 | [OAuthForge](labs/17-oauthforge/) | OAuth 2.0 / OIDC — `redirect_uri` sem validação, `state` ausente (CSRF), reuso de código de autorização, downgrade de PKCE e ausência de autenticação do cliente | 5 |
 | 18 | [JavaForge](labs/18-javaforge/) | **Desserialização nativa do Java** (`rO0AB` → gadget → RCE), credenciais padrão do Tomcat, stack traces Java, pilha em fim de vida | 5 |
 | 19 | [SmuggleForge](labs/19-smuggleforge/) | **Contrabando de requisições HTTP** — dessincronização CL.TE real entre front-end e back-end para burlar o bloqueio de `/admin`, mais divulgação por banner e cabeçalho | 3 |
-| 20 | [GraphForge](labs/20-graphforge/) | GraphQL avançado — negação de serviço por amplificação de aliases, mutation privilegiada sem autenticação (BFLA), CSRF de GraphQL (GET e formulário), introspecção | 5 |
+| 20 | [GraphForge](labs/20-graphforge/) | GraphQL avançado — DoS por amplificação de aliases, mutation privilegiada sem autenticação (BFLA), CSRF de GraphQL (GET e formulário), introspecção | 5 |
 
 **134 vulnerabilidades plantadas em 20 laboratórios web.**
 
@@ -212,12 +212,12 @@ de vulnerabilidades plantadas no gabarito daquele laboratório.
 > biblioteca padrão (`python labs/NN/app.py`). O laboratório 11 é **PHP**
 > (`labs/11-legacyportal/serve.sh`) e precisa do PHP no PATH.
 
-## Os laboratórios móveis (Android) · nova trilha
+## Os laboratórios mobile (Android) · nova trilha
 
 Uma trilha paralela em [`labs/mobile/`](labs/mobile/) estende o benchmark para a
 **análise de aplicativos Android**. Onde os laboratórios web medem *exploração ao
-vivo*, os móveis medem **avaliação estática e dinâmica de aplicativo** — a
-metodologia que um pentester móvel aplica a um APK decompilado (manifesto,
+vivo*, os mobile medem **avaliação estática e dinâmica de aplicativo** — a
+metodologia que um pentester mobile aplica a um APK decompilado (manifesto,
 segredos, armazenamento, criptografia, IPC, confiança de rede, WebView) e às
 **proteções em tempo de execução** (detecção de root e de emulador, anti-Frida,
 anti-depuração, pinning de certificado, ofuscação).
@@ -229,11 +229,11 @@ com `apktool b`. Mesmo contrato dos laboratórios web: um gabarito
 `gabarito.json`, pontuado por **classe + localização**.
 
 A escada sobe de um aplicativo escancarado até um endurecido como um alvo real de
-banco móvel (RASP, pinning nativo, anti-instrumentação, ofuscação):
+banco mobile (RASP, pinning nativo, anti-instrumentação, ofuscação):
 
 | Degrau | Laboratório | Tema |
 |--------|-------------|------|
-| M01 | [LeakyVault](labs/mobile/M01-leakyvault/) ✅ | Fruta ao alcance da mão — debuggable, `allowBackup`, componentes exportados, tráfego em texto claro, segredos embutidos · **5 vulns, 100% de recall** |
+| M01 | [LeakyVault](labs/mobile/M01-leakyvault/) ✅ | Fruta estática — debuggable, `allowBackup`, componentes exportados, tráfego em texto claro, segredos embutidos · **5 vulns, 100% de recall** |
 | M02 | [StorageCrypt](labs/mobile/M02-storagecrypt/) ✅ | Armazenamento e criptografia inseguros — prefs legíveis por todos, SQLite e PII em texto plano, AES-ECB com IV estático, MD5, logs sensíveis · **4 vulns, 100% de recall** |
 | M03 | NetForge | Confiança de rede — `X509TrustManager` que aceita tudo, verificador de hostname permissivo, ausência de pinning, ponte JS e acesso a arquivos na WebView |
 | M04 | DeepLinkForge | IPC e deep links — desvio de autenticação por componente exportado, travessia em content provider, redirecionamento por deep link e intent |
@@ -283,7 +283,7 @@ a 100% de recall:
 | 04 ShopAPI | 67% | **100%** | faltavam as classes BFLA e exposição excessiva de dados |
 | 05 SpringVault | 71% | **100%** | interface de gerenciamento classificada como RCE |
 | 06 OpenServices | 0% | **100%** | nenhum vocabulário de infraestrutura (serviço exposto, credenciais padrão) |
-| 07 GraphVault | 75% | **100%** | faltavam as classes de introspecção de GraphQL e negação de serviço |
+| 07 GraphVault | 75% | **100%** | faltavam as classes de introspecção de GraphQL e DoS |
 | 08 TrustEdge | 14% | **100%** | nenhum vocabulário de confiança em cabeçalhos (CORS, Host, CRLF, cache) |
 | 09 InjectArena | 0% | **100%** | nenhuma classe de injeção NoSQL, LDAP, XPath, SSI ou CSV |
 | 10 UploadForge | 86% | **100%** | upload→RCE detectado mas classificado como `rce`; `upload` precisa vencer o `rce` genérico |
@@ -310,9 +310,9 @@ Os gabaritos fazem de cada laboratório um **conjunto de dados rotulado**:
   negativos difíceis; os falsos positivos são ruído a penalizar. Monte sinal de
   SFT, DPO ou RL a partir dessa diferença.
 - **Currículo** = os laboratórios vão do fácil (exposição de arquivo) ao sutil
-  (confusão de algoritmo em JWT, negação de serviço por profundidade em GraphQL,
+  (confusão de algoritmo em JWT, DoS por profundidade em GraphQL,
   dessincronização CL.TE); ordene-os para desenvolver a capacidade aos poucos.
-- **Portão de regressão** = exija recall maior ou igual à meta em todos os
+- **Trava de regressão** = exija recall maior ou igual à meta em todos os
   laboratórios antes de publicar um modelo ou prompt novo.
 
 ## Estrutura do repositório
@@ -324,7 +324,7 @@ labs/<NN-nome>/          # laboratórios web (01–20)
   README.md              # o que é, como rodar, a tabela de vulnerabilidades plantadas
   RESULTS.md             # a nota da execução de referência e o que ela revelou
 labs/mobile/             # laboratórios Android (M01…) — árvores de APK decompilado e gabaritos
-  MOBILE.md              # especificação da trilha móvel, formato e pontuação
+  MOBILE.md              # especificação da trilha mobile, formato e pontuação
 harness/
   score_lab.py           # pontua os achados de qualquer agente contra um gabarito
   classify.py            # taxonomia canônica autônoma (texto livre -> chave de classe)

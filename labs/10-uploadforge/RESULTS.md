@@ -1,85 +1,80 @@
-# Lab 10 — UploadForge — Resultados
+# Lab 10 — UploadForge — Results
 
-Pontuação do plugin DroidAgent contra as 7 vulnerabilidades plantadas do
-UploadForge. O plugin rodou a **esteira completa** (engage-init → passive_audit +
-content_discovery → specialist_dispatcher → especialistas da Fase 4), com os
-agentes de exploração **às cegas** — só alvo ao vivo + a base de conhecimento do
-próprio plugin, nunca o gabarito.
+Scoring the DroidAgent plugin against UploadForge's 7 planted vulns. The plugin
+ran the **full pipeline** (engage-init → passive_audit + content_discovery →
+specialist_dispatcher → Fase-4 specialists), with the exploitation agents **blind**
+— live target + the plugin's own knowledge base only, never the answer key.
 
-## Método
+## Method
 
-Quatro especialistas da Fase 4 às cegas rodaram em paralelo (caçador de RCE,
-caçador de tomada de conta/autenticação, IDOR/BFLA, injeção/lado do cliente). O
-caçador de RCE — que a metodologia web manda sempre perseguir upload→webshell→RCE —
-entrou com o padrão `operator:operator`, enviou um template `{{exec:…}}` (a falta
-de validação o aceitou) e o renderizou para execução de comando ao vivo
-(`whoami`→`eep0x10`, `id`→uid…). Todas as 7 plantadas foram confirmadas com
-requisições ao vivo, mais 6 bônus genuínos (BFLA em `/render`, tokens de sessão
-sequenciais previsíveis, sem limite de taxa, cookies inseguros, vazamento de token
-interno, clickjacking). O `score_lab.py` casou por classe+rota.
+Four blind Fase-4 specialists ran in parallel (RCE-hunter, ATO/auth-hunter,
+IDOR/BFLA, injection/client-side). The RCE-hunter — which the web methodology
+mandates always chase upload→webshell→RCE — logged in with the default
+`operator:operator`, uploaded a `{{exec:…}}` template (no validation accepted it),
+and rendered it for live command execution (`whoami`→`eep0x10`, `id`→uid…). All 7
+planted vulns were confirmed with live requests, plus 6 genuine bonus findings
+(BFLA on `/render`, predictable sequential session tokens, no rate-limit, insecure
+cookies, internal-token leak, clickjacking). `score_lab.py` matched by class+route.
 
-## Nota
+## Score
 
-| Passada | Recall | Precisão | Notas |
-|---------|--------|----------|-------|
-| Linha de base | **6/7 (86%)** | 43% | upload→RCE detectado mas **classificado `rce`**, não `upload`; um bônus caiu em `other` |
-| Após correção | **7/7 (100%)** | 54% | classe upload restaurada; os bônus ganham classes canônicas. Precisão <100% = 6 bônus reais, **zero falso positivo** |
+| Pass | Recall | Precision | Notes |
+|------|--------|-----------|-------|
+| Baseline | **6/7 (86%)** | 43% | upload→RCE detected but **classified `rce`**, not `upload`; one bonus finding fell to `other` |
+| After fix | **7/7 (100%)** | 54% | upload class restored; bonus findings get canonical classes. Precision <100% = 6 real bonus findings, **zero false positives** |
 
-O plugin **detectou tudo na primeira passada — inclusive a cadeia completa
-upload→webshell→RCE.** A lacuna foi, mais uma vez, **classificação**, não detecção.
+The plugin **detected everything on the first pass — including the full
+upload→webshell→RCE chain.** The gap was, once again, **classification**, not
+detection.
 
-## As lacunas que este laboratório revelou (3 correções reais no `finding_model`)
+## The gaps this lab exposed (3 real `finding_model` fixes)
 
-1. **`upload` precisa vencer `rce`.** O achado joia da coroa — "Unrestricted File
-   Upload leading to Remote Code Execution (webshell)" — batia na regex genérica de
-   `rce` (`remote code`) primeiro, porque `rce` precedia `upload` na lista de
-   classes. Então a prioridade #1 de RCE do plugin era *achada mas mal
-   categorizada* (e pontuada como falha). Correção: `upload` movido **antes** de
-   `rce` e a regex dele ampliada para manter a classe canônica `upload` mesmo
-   quando o título cita o *impacto* de RCE. Um RCE de injeção de comando puro ("OS
-   Command Injection") não tem palavras de upload e ainda classifica como `rce`
-   (Lab 03 inalterado). *Mesma regra de específico-antes-de-genérico que
-   nosqli-antes-de-sqli.*
+1. **`upload` must beat `rce`.** The crown-jewel finding — "Unrestricted File
+   Upload leading to Remote Code Execution (webshell)" — hit the generic `rce`
+   regex (`remote code`) first, because `rce` preceded `upload` in the class list.
+   So the plugin's #1 RCE priority was *found but mis-categorized* (and scored as a
+   miss). Fix: moved `upload` **before** `rce` and broadened its regex to keep the
+   canonical class `upload` even when the title states the RCE *impact*. A pure
+   command-injection RCE ("OS Command Injection") has no upload words and still
+   classifies as `rce` (Lab 03 unchanged). *Same specific-before-generic rule as
+   nosqli-before-sqli.*
 
-2. **Vocabulário de controle de acesso quebrado.** Um bônus ("Unauthenticated
-   Access to Uploaded Files", "Missing Object-Level Authorization") não casava com
-   classe nenhuma → `other`. Adicionada uma captura **tardia** (depois das classes
-   específicas de controle de acesso e de serviço exposto, para não roubar o Lab
-   06) roteando restos de missing-auth / unauthenticated-access /
-   broken-access-control para o balde de acesso a objeto `idor`.
+2. **Broken-access-control vocabulary.** A bonus finding ("Unauthenticated Access
+   to Uploaded Files", "Missing Object-Level Authorization") matched no class →
+   `other`. Added a **late** catch (after the specific access-control and
+   exposed-service classes, so it can't steal Lab 06) routing
+   missing-auth / unauthenticated-access / broken-access-control leftovers to the
+   `idor` object-access bucket.
 
-3. **Vocabulário de sessão estreito demais.** "Session Tokens **Without Expiry**
-   and **No Logout** Endpoint" exigia que a regex dissesse "never expir"/"not
-   invalidated" → caía em `other`. `session` ampliada para também pegar "without
-   expiry / no expiry / no logout endpoint". (Cuidado tomado: não ampliar demais
-   `predictable.*token`, que roubaria o "predictable password reset token" do Lab
-   02 — um achado `auth` — verificado por regressão.)
+3. **Session vocabulary too narrow.** "Session Tokens **Without Expiry** and **No
+   Logout** Endpoint" required the regex to say "never expir"/"not invalidated" →
+   fell to `other`. Broadened `session` to also catch "without expiry / no expiry /
+   no logout endpoint". (Care taken: not over-broadening `predictable.*token`,
+   which would steal Lab 02's "predictable password reset token" — an `auth`
+   finding — verified by regression.)
 
-Repontuação: **7/7, nenhum achado no balde `other` e sem regressão** — todos os 10
-labs seguem com 100% de recall (Lab 02 de volta a 12/12 depois de a regex de
-sessão ser apertada).
+Re-score: **7/7, no `other`-bucket findings, and no regression** — all 10 labs
+remain 100% recall (Lab 02 back to 12/12 after the session-regex was tightened).
 
-## A lacuna de reconhecimento/despacho que este laboratório revelou (notada, ainda não fechada)
+## The recon/dispatch gap this lab exposed (noted, not yet closed)
 
-O front-end determinístico **não** apontou para o vetor de upload sozinho: o
-`content_discovery` levantou apenas os alcançáveis por GET `/myfiles` + `/render`
-(os só-POST `/upload`, `/login` foram filtrados), e **não há tipo de sinal** para
-"endpoint de upload de arquivo" ou "formulário de login" — então o dispatcher
-emitiu apenas os especialistas passivos de clickjacking/cabeçalhos. A cadeia
-upload→RCE foi carregada inteiramente pelo caçador de RCE às cegas descobrindo o
-`/upload` pelo índice `/`, exatamente como a metodologia web manda. Funcionou aqui,
-mas uma esteira mais robusta emitiria um sinal `file-upload-detected` /
-`auth-endpoint-detected` e despacharia um especialista automaticamente em vez de
-depender do especialista LLM achar o vetor. Registrado como a principal melhoria de
-acompanhamento.
+The deterministic front-end did **not** point at the upload vector on its own:
+`content_discovery` surfaced only the GET-reachable `/myfiles` + `/render` (the
+POST-only `/upload`, `/login` were filtered), and there is **no signal type** for
+"file-upload endpoint" or "login form" — so the dispatcher emitted only the passive
+clickjacking/headers specialists. The upload→RCE chain was carried entirely by the
+blind RCE-hunter discovering `/upload` from the `/` index, exactly as the web
+methodology mandates. That worked here, but a more robust pipeline would emit a
+`file-upload-detected` / `auth-endpoint-detected` signal and auto-dispatch a
+specialist rather than relying on the LLM specialist to find the vector. Logged as
+the top follow-up improvement.
 
-## Pontos fortes confirmados
+## Strong points confirmed
 
-- O ofício dos agentes às cegas foi completo e **encadeado**: credenciais padrão →
-  autenticação → upload irrestrito → renderização no servidor → RCE, provado ao vivo.
-- A segurança por projeto se manteve: a webshell executou apenas a lista de
-  permissão de canários somente leitura; comandos fora do canário foram confirmados
-  como capazes de RCE sem rodar.
-- Entrega além do pedido, não ruído: todo achado "extra" foi uma fraqueza adicional
-  real (BFLA, sessões previsíveis, sem limite de taxa, cookies inseguros, vazamento
-  de token, clickjacking) — zero falso positivo.
+- The blind agents' tradecraft was complete and **chained**: default-creds → auth
+  → unrestricted upload → server-side render → RCE, proven live.
+- Safety-by-design held: the webshell executed only the read-only canary
+  allow-list; non-canary commands were confirmed RCE-capable without running.
+- Over-delivery, not noise: every "extra" finding was a real additional weakness
+  (BFLA, predictable sessions, no-rate-limit, insecure cookies, token leak,
+  clickjacking) — zero false positives.

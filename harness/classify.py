@@ -1,41 +1,40 @@
 #!/usr/bin/env python3
-"""classify.py — taxonomia autônoma de vulnerabilidades do HackerDummy.
+"""classify.py — HackerDummy's standalone vulnerability taxonomy.
 
-Mapeia o título de um achado em texto livre (seja lá como a IA/agente chame a
-falha) para uma chave de classe canônica, de modo que achados de QUALQUER
-ferramenta — Claude, GPT/Codex, Cursor, um LLM local, um plugin próprio — possam
-ser pontuados contra os gabaritos dos laboratórios sem obrigar a ferramenta a
-conhecer os nossos nomes de classe.
+Maps a free-text finding title (whatever an AI/agent calls a vuln) to a
+canonical class key, so findings from ANY tool — Claude, GPT/Codex, Cursor,
+a local LLM, a custom plugin — can be scored against the labs' answer keys
+without forcing the tool to know our class names.
 
-Autocontido (apenas a biblioteca padrão), sem dependência de nenhuma ferramenta
-de pentest. As chaves de classe daqui SÃO o contrato do benchmark; cada
-``gabarito.json`` usa as mesmas chaves.
+Self-contained (pure stdlib) with no dependency on any pentest tool. The class
+keys here ARE the benchmark's contract; the per-lab ``gabarito.json`` files use
+the same keys.
 
-Uso::
+Usage::
 
     from classify import classify, classify_detail
 
     classify("SQL Injection (auth bypass)")   # -> "sqli"
-    classify("Redis exposto sem autenticação")  # -> "exposed-service"
-    classify_detail("XSS armazenado no perfil")  # -> Match(key='stored-xss', ...)
+    classify("Exposed Redis without auth")    # -> "exposed-service"
+    classify_detail("Stored XSS in profile")  # -> Match(key='stored-xss', ...)
 
-Linha de comando::
+Command line::
 
-    python3 classify.py "Injeção de SQL" "Redis exposto"  # um por argumento
-    cat titulos.txt | python3 classify.py -               # um por linha da entrada
-    python3 classify.py --json -                          # saída em JSONL
-    python3 classify.py --list-classes                    # imprime o contrato
+    python3 classify.py "SQL Injection" "Exposed Redis"   # one per argument
+    cat titles.txt | python3 classify.py -                # one per input line
+    python3 classify.py --json -                          # JSONL output
+    python3 classify.py --list-classes                    # dump the contract
 
-A ordem importa: padrões mais específicos vêm primeiro, para vencerem os
-genéricos (por exemplo ``actuator`` antes de ``rce``; ``default-creds`` antes de
-``creds``; ``stored-xss`` antes de ``xss``; ``no-rate-limit`` antes de
-``graphql``).
+Order matters: more specific patterns come first so they win over generic ones
+(e.g. ``actuator`` before ``rce``; ``default-creds`` before ``creds``;
+``stored-xss`` before ``xss``; ``no-rate-limit`` before ``graphql``).
 
-Os padrões cobrem português e inglês, com ou sem acento (``inje[cç][aã]o``),
-porque os agentes relatam achados em qualquer um dos dois idiomas. Quando os
-dois colidem, vale a precedência do inglês: "Injeção de cabeçalho Host na
-redefinição de senha" cai em ``auth``, exatamente como o equivalente em inglês.
+Patterns cover English and Portuguese wording, with or without accents
+(``inje[cç][aã]o``), because agents report findings in either language. When
+the two collide the English precedence wins, so "Injecao de cabecalho Host na
+redefinicao de senha" lands on ``auth`` exactly as its English counterpart does.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -59,16 +58,16 @@ __all__ = [
     "main",
 ]
 
-#: Chave devolvida quando nenhuma regra casa.
+#: Key returned when no rule matches.
 DEFAULT_CLASS = "other"
 
-#: Tamanho do cache de :func:`classify`; execuções do benchmark repetem muito título.
+#: Cache size for :func:`classify`; benchmark runs repeat titles a lot.
 _CACHE_SIZE = 4096
 
 
 @dataclass(frozen=True, slots=True)
 class Rule:
-    """Uma regra da taxonomia: o padrão compilado e a chave de classe que ele produz."""
+    """One taxonomy rule: a compiled pattern and the class key it yields."""
 
     key: str
     pattern: re.Pattern[str]
@@ -79,7 +78,7 @@ class Rule:
 
 
 class Match(NamedTuple):
-    """Resultado de uma classificação, com a evidência que a produziu."""
+    """Result of a classification, with the evidence that produced it."""
 
     key: str
     matched_text: str | None = None
@@ -90,9 +89,8 @@ class Match(NamedTuple):
         return self.key == DEFAULT_CLASS
 
 
-# (regex, chave_de_classe_canônica) — o primeiro casamento vence. Mantido como
-# lista simples de tuplas para a taxonomia continuar fácil de comparar em diff e
-# de copiar entre ferramentas.
+# (regex, canonical_class_key) — first match wins. Kept as a plain list of
+# tuples so the taxonomy stays diffable and copy-pasteable across tools.
 TAXONOMY: list[tuple[str, str]] = [
     (r"nosql.?inj|no-?sql inj|mongo.*inject|inject.*mongo|operator injection|nosql.*operator|inje[cç][aãa]o.*nosql|nosql.*inje[cç]|nosql.*operador|operador.*nosql|mongo.*inje[cç]", "nosqli"),
     (r"ldap inject|ldap.?injection|inje[cç].*ldap", "ldap-injection"),
@@ -101,9 +99,9 @@ TAXONOMY: list[tuple[str, str]] = [
     (r"csv inject|formula inject|csv.*formula|formula.*csv|spreadsheet inject|inje[cç][aã]o de f[oó]rmula|f[oó]rmula.*csv|csv.*f[oó]rmula|planilha.*f[oó]rmula", "csv-injection"),
     (r"sql.?inj|\bsqli\b|union.?based|boolean.?based|error.?based|inje[cç].*sql", "sqli"),
     (r"\bactuator\b|spring boot actuator|jolokia|h2[\s-]?console|heapdump|jmx[\s-]?(http|over|console|exposed)|console h2", "actuator"),
-    # upload antes de rce: um achado de envio irrestrito de arquivo é da classe 'upload'
-    # mesmo quando o título cita o impacto de RCE ("File Upload -> RCE / webshell"). O RCE
-    # puro, por injeção de comando, não tem palavras de upload e cai em 'rce'.
+    # upload before rce: an unrestricted-upload finding is class 'upload' even when the
+    # title states the RCE impact ("File Upload -> RCE / webshell"). Pure command-injection
+    # RCE has no upload words and falls through to 'rce'.
     (r"file.?upload|unrestricted upload|arbitrary file|webshell|polyglot|upload.*(shell|arbitr|malicios|webshell|rce|remote code|execu)|envio de arquivo|upload de arquivo|arquivo.*sem valida[cç][aã]o|extens[aã]o.*(n[aã]o validad|sem valida)", "upload"),
     (r"\bxxe\b|xml external entit|external general entit|external.*entity injection|entidade externa", "xxe"),
     (r"deserializ|desserializ|insecure.*deserial|unsafe.*(pickle|unpickle|unserialize|marshal)|pickle.*load|object injection|__reduce__|unmarshal|desserializa[cç][aã]o insegura", "deserialization"),
@@ -123,9 +121,8 @@ TAXONOMY: list[tuple[str, str]] = [
     (r"rate.?limit|brute.?force|for[çc]a bruta|no lockout|account lockout|excessive.*(attempts|requests)|throttl|limite de tentativas|limita[cç][aã]o de taxa|bloqueio de conta|tentativas excessivas", "no-rate-limit"),
     (r"mass.?assignment|mass-assign|auto.?bind|over.?post|autobinding|atribui[cç][aã]o em massa", "mass-assignment"),
     (r"race.?cond|\btoctou\b|time.?of.?check|check.?then.?act|double.?spend|concurren\w*.*(redeem|withdraw|transfer|purchase|spend|double|limit|bypass)|parallel.*request.*(double|race|bypass)|condi[cç][aã]o de corrida", "race-condition"),
-    # ── Classes móveis de armazenamento e criptografia — antes de weak-crypto;
-    # backup-allowed antes de insecure-storage para que um achado de "allowBackup ->
-    # extrair prefs/db" continue em backup-allowed ──
+    # ── Mobile storage/crypto classes — before weak-crypto; backup-allowed before
+    # insecure-storage so an "allowBackup -> extract prefs/db" finding stays backup-allowed ──
     (r"android:allowbackup|allow.?backup|\ballowbackup\b|adb backup|backup.*(enabled|allowed|permitted)|backup flag|c[oó]pia de seguran[cç]a.*(permitid|habilitad|ativad)|backup.*(permitid|habilitad|ativad)", "backup-allowed"),
     (r"shared.?pref\w*.*(world.?readable|plaintext|cleartext|mode_world|unencrypt|sensitive|token|password|secret|pii|pan)|mode_world_readable|world.?(readable|writable).*(pref|file|storage|db)|plaintext.*(sqlite|database|\.db\b|shared.?pref|prefs)|(sqlite|database|\.db\b).*(plaintext|unencrypt|cleartext|sensitive|pii|no.?encrypt|sqlcipher)|insecure (local )?(data )?storage|sensitive data.*(stored|saved|at rest).*(plaintext|cleartext|unencrypt)|stores?.*(token|password|\bpin\b|pii|card|pan|credential).*(plaintext|cleartext|unencrypt|shared.?pref|sqlite|external storage)|external storage.*(secret|token|sensitive|password|pii|credential)|armazenamento inseguro de dados|armazenamento local inseguro|armazenamento inseguro no dispositivo|dados sens[ií]veis.*(texto claro|texto plano|sem criptografia|n[aã]o criptografad)|armazenad[oa]s?.*(em )?texto (claro|plano)", "insecure-storage"),
     (r"logcat|log\.[dveiw]\b|android\.util\.log|(token|password|secret|credential|session|\bpan\b|card (number|pan)|\bpii\b|\bcpf\b).*(logged|written to (the )?log|leaked? (to|via|into) (the )?log)|sensitive (data|info\w*).*(logged|in (the )?logs?|logcat)|(token|senha|segredo|credencial|cart[aã]o|cpf).*(nos registros|no log|em log|registrado)|gravado nos registros|dados sens[ií]veis.*(registros|logs?)", "sensitive-log"),
@@ -141,16 +138,14 @@ TAXONOMY: list[tuple[str, str]] = [
     (r"\bcrlf\b|response splitting|http response split|carriage return.*line feed|cr.?lf inject|header inject.*(crlf|newline|response)|divis[aã]o de resposta", "crlf"),
     (r"cache poison|web cache (poison|decept)|unkeyed (header|input|param)|cache.*(poison|decept)|envenenamento de cache", "cache-poisoning"),
     (r"graphql.*introspect|introspection (enabled|exposed|habilitada|on|ativ)|\b__schema\b|\b__type\b|graphql schema (expos|leak|dump)|introspec[cç][aã]o", "graphql"),
-    # `dos` precisa de contexto: "dos" sozinho é palavra comum em português ("vazamento
-    # dos tokens"), e esta regra fica acima de creds/backup, então um \bdos\b desprotegido
-    # roubava esses achados.
+    # `dos` needs context: bare "dos" is a common Portuguese word ("vazamento dos tokens"),
+    # and this rule sits above creds/backup, so an unguarded \bdos\b stole those findings.
     (r"denial of service|nega[çc][ãa]o de servi[çc]o|\bddos\b|\bdos\b[\s/-]*(attack|attempts?|condition|vulnerabilit\w*|risk|vector|via|through|by|exhaustion|flood|bomb|cpu|mem[oó]r?[iy]a?\w*)|(attack|ataque|vulnerabilit\w*|vulnerabilidade|potential|possible|application.?level|network.?level)[\s/-]+(de[\s/-]+)?\bdos\b|resource (exhaustion|consumption)|uncontrolled resource|query (depth|complexity)|(depth|complexity) (limit|attack|bomb)|amplification|exaust[aã]o de recursos|consumo excessivo de recursos", "dos"),
     (r"open.?redirect|unvalidated redirect|redirect.*unvalidat|url redirection|redirect.*untrusted|redirecionamento (aberto|n[aã]o validado)", "open-redirect"),
     (r"\.git\b|git.?expos|svn.?expos|reposit[oó]rio.*expos|source.*repo|version.?control.*expos", "scm"),
     (r"web\.config|connection string|machinekey|appsettings.*secret", "web-config"),
-    # ── Classes de análise estática móvel (Android) — colocadas antes de backup,
-    # admin-panel e headers da web, para a classe móvel específica vencer essas colisões
-    # (por exemplo "adb backup file") ──
+    # ── Mobile (Android) static-analysis classes — placed before web backup/admin-panel/
+    # headers so the specific mobile class wins those collisions (e.g. "adb backup file") ──
     (r"android:debuggable|\bdebuggable\b|debug flag.*(true|enabled|on)|app.*debuggable|depur[aá]vel|sinalizador de depura[cç][aã]o", "debuggable"),
     (r"android:exported|exported (activity|service|receiver|provider|component)|(activity|service|receiver|provider|content provider).*(exported|no permission|without permission|sem permiss)|exported.*(component|without.*permission|no.?permission)|improperly exported|componente exportado", "exported-component"),
     (r"usescleartexttraffic|cleartexttrafficpermitted|cleartext traffic|clear.?text traffic|network.?security.?config.*(cleartext|permit|http)|cleartext.*(permitted|allowed|enabled|traffic|connection|http)|unencrypted (http|traffic|connection)|tr[aá]fego (em texto claro|n[aã]o criptografado)|texto claro.*(permitid|habilitad)", "cleartext-traffic"),
@@ -166,36 +161,36 @@ TAXONOMY: list[tuple[str, str]] = [
     (r"version disclos|disclosure de vers|vers[aã]o.*expos|x-aspnet-version|x-powered-by|software.*banner|divulga[cç][aã]o (da|de) vers[aã]o|vers[aã]o.*(divulgad|revelad)", "version"),
     (r"credential|senhas|password.*file|creds.*expos|plaintext.*pass|cred.*expos|arquivo.*senha|\.env\b|environment file|secrets?.*(expos|leak|disclos|hardcod|in (the )?(apk|dex|strings|assets|smali|source|code))|api.?key.*(expos|leak|hardcod|in (the )?(apk|dex|strings|assets|smali|code))|secret.*disclosure|hardcoded secret|hard.?cod.*(secret|api.?key|token|\bkey\b|credential)|chave de api|credenciais? (expost|vazad|em texto (claro|plano)|em claro|no c[oó]digo|hardcoded)|segredo (embutid|codificad|no c[oó]digo)|(embutid|codificad)[oa]s?.*(no )?(c[oó]digo|aplicativo|fonte)", "creds"),
     (r"missing authentication|no authentication required|unauthenticated access|authentication not required|broken access control|missing authoriz|missing object.?level author|acesso sem autentica[cç][aã]o", "idor"),
-    # rce é a ÚLTIMA classe de impacto: "<X> -> RCE" mantém a causa raiz X (toda causa
-    # raiz específica que leva a RCE está acima). Só a injeção de comando pura cai aqui.
+    # rce is the LAST impact class: "<X> -> RCE" keeps root cause X (every specific
+    # root cause that leads to RCE is above). Only pure command-injection lands here.
     (r"\brce\b|remote code|command inj|os command|code execution|inje[cç].*comando|execu[cç][aã]o remota de c[oó]digo|execu[cç][aã]o de c[oó]digo|inje[cç][aã]o de comando", "rce"),
     (r"info.*disclos|information disclosure|path disclos|internal path|caminho.*interno|vazamento|verbose error|erro verboso|stack.?trace|traceback|debug mode|field suggestion|unhandled exception|trace\.axd|asp.?net.*trace|\belmah\b|customerror|yellow screen of death|divulga[cç][aã]o de informa|rastreamento de pilha|modo de depura[cç][aã]o|erro detalhad|exce[cç][aã]o n[aã]o tratada", "info-disc"),
 ]
 
 
 def _compile(taxonomy: Sequence[tuple[str, str]]) -> list[Rule]:
-    """Compila a taxonomia, falhando de forma explícita em um padrão malformado."""
+    """Compile the taxonomy, failing loudly on a malformed pattern."""
     rules: list[Rule] = []
     for index, (pattern, key) in enumerate(taxonomy):
         try:
             compiled = re.compile(pattern, re.IGNORECASE)
         except re.error as exc:  # pragma: no cover - guards authoring mistakes
-            raise ValueError(f"padrão inválido para a classe {key!r} no índice {index}: {exc}") from exc
+            raise ValueError(f"invalid pattern for class {key!r} at index {index}: {exc}") from exc
         rules.append(Rule(key=key, pattern=compiled))
     return rules
 
 
-#: Taxonomia compilada, em ordem de prioridade.
+#: Compiled taxonomy, in priority order.
 RULES: list[Rule] = _compile(TAXONOMY)
 
-#: Todas as chaves de classe canônicas, sem repetição, na ordem da primeira
-#: aparição. Uma chave pode sustentar várias regras (``creds`` e ``idor`` fazem
-#: isso), então dict.fromkeys mantém o contrato como um conjunto de chaves distintas.
+#: Every canonical class key, deduplicated, in first-appearance order.
+#: A key may back several rules (``creds`` and ``idor`` do), so dict.fromkeys
+#: keeps the contract a set of distinct keys.
 CLASS_KEYS: list[str] = list(dict.fromkeys([rule.key for rule in RULES] + [DEFAULT_CLASS]))
 
 
 def classify_detail(text: str | None) -> Match:
-    """Classifica ``text`` e devolve a chave junto com a evidência que a sustenta."""
+    """Classify ``text`` and return the key plus the evidence for it."""
     haystack = text or ""
     for rule in RULES:
         found = rule.search(haystack)
@@ -210,15 +205,15 @@ def _classify_cached(text: str) -> str:
 
 
 def classify(text: str | None) -> str:
-    """Devolve a chave de classe canônica para um título ou descrição em texto livre."""
+    """Return the canonical class key for a free-text finding title/description."""
     return _classify_cached(text or "")
 
 
 def classify_all(text: str | None) -> list[str]:
-    """Devolve todas as chaves de classe cujo padrão casa, na ordem da taxonomia.
+    """Return every class key whose pattern matches, in taxonomy order.
 
-    Útil para auditar sobreposições na taxonomia; a pontuação usa :func:`classify`,
-    que mantém apenas o primeiro casamento, o mais específico.
+    Useful for auditing overlaps in the taxonomy; scoring uses :func:`classify`,
+    which keeps only the first (most specific) match.
     """
     haystack = text or ""
     keys = [rule.key for rule in RULES if rule.search(haystack)]
@@ -226,7 +221,7 @@ def classify_all(text: str | None) -> list[str]:
 
 
 def _read_inputs(values: Iterable[str]) -> list[str]:
-    """Expande um argumento ``-`` nas linhas não vazias da entrada padrão."""
+    """Expand a literal ``-`` argument into the non-empty lines of stdin."""
     items: list[str] = []
     for value in values:
         if value == "-":
@@ -239,14 +234,14 @@ def _read_inputs(values: Iterable[str]) -> list[str]:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="classify.py",
-        description="Mapeia achados de vulnerabilidade em texto livre para as chaves canônicas do HackerDummy.",
-        epilog="Use '-' como título para ler um achado por linha da entrada padrão.",
+        description="Map free-text vulnerability findings to HackerDummy canonical class keys.",
+        epilog="Use '-' as a title to read one finding per line from stdin.",
     )
-    parser.add_argument("titles", nargs="*", help="títulos de achados a classificar; '-' lê a entrada padrão")
-    parser.add_argument("--json", action="store_true", help="emite um objeto JSON por linha")
-    parser.add_argument("--explain", action="store_true", help="mostra o trecho casado e o padrão")
-    parser.add_argument("--all", action="store_true", help="lista todas as classes que casam, não só a vencedora")
-    parser.add_argument("--list-classes", action="store_true", help="imprime todas as chaves canônicas e sai")
+    parser.add_argument("titles", nargs="*", help="finding titles to classify; '-' reads stdin")
+    parser.add_argument("--json", action="store_true", help="emit one JSON object per line")
+    parser.add_argument("--explain", action="store_true", help="show the matched text and pattern")
+    parser.add_argument("--all", action="store_true", help="list every matching class, not just the winner")
+    parser.add_argument("--list-classes", action="store_true", help="print every canonical class key and exit")
     return parser
 
 
@@ -264,7 +259,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     titles = _read_inputs(args.titles)
     if not titles:
         _build_parser().print_usage(sys.stderr)
-        print("classify.py: nenhum título informado", file=sys.stderr)
+        print("classify.py: no titles given", file=sys.stderr)
         return 2
 
     for title in titles:
@@ -279,9 +274,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.json:
             print(json.dumps(record, ensure_ascii=False))
         elif args.explain:
-            print(f"{title!r} -> {result.key}  (casou {result.matched_text!r})")
+            print(f"{title!r} -> {result.key}  (matched {result.matched_text!r})")
         elif args.all:
-            print(f"{title!r} -> {result.key}  (todas: {', '.join(record['all_classes'])})")
+            print(f"{title!r} -> {result.key}  (all: {', '.join(record['all_classes'])})")
         else:
             print(f"{title!r} -> {result.key}")
     return 0

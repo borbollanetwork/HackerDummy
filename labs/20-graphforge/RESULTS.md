@@ -1,42 +1,40 @@
-# Lab 20 — GraphForge — Resultados
+# Lab 20 — GraphForge — Results
 
-GraphQL avançado — além do reconhecimento básico do Lab 07 (GraphVault), na
-superfície de ataque de execução de query: amplificação de custo por aliases (DoS),
-uma mutation privilegiada sem autenticação (BFLA), CSRF de GraphQL por GET / POST
-form-encoded e introspecção habilitada em produção.
+Advanced GraphQL — beyond the basic recon of Lab 07 (GraphVault) into the
+query-execution attack surface: alias-based cost amplification (DoS), an
+unauthenticated privileged mutation (BFLA), GraphQL CSRF via GET / form-encoded POST,
+and introspection enabled in production.
 
-## Resultado: 100% na PRIMEIRA passada — uma confirmação limpa de cobertura
+## Result: 100% on the FIRST pass — a clean coverage confirmation
 
-| Passada | Recall | Precisão | Notas |
-|---------|--------|----------|-------|
-| Linha de base | **5/5 (100%)** | 83% | sem correção necessária — todo achado classificou certo de saída |
+| Pass | Recall | Precision | Notes |
+|------|--------|-----------|-------|
+| Baseline | **5/5 (100%)** | 83% | no fix needed — every finding classified correctly out of the box |
 
-O especialista de GraphQL às cegas achou tudo: despejou o schema por introspecção
-(notando o campo sensível `User.ssn` e a mutation `promoteToAdmin`), disparou a
-mutation `promoteToAdmin` sem autenticação (escalada de privilégio, sem credenciais),
-provou que a mesma mutation funciona por **GET** e por **POST form-encoded** (CSRF,
-sem token / sem exigir JSON) e amplificou uma query `report` com aliases a ~1 MB sem
-limite de custo.
+The blind GraphQL specialist found everything: it dumped the schema via introspection
+(noting the sensitive `User.ssn` field and the `promoteToAdmin` mutation), fired the
+unauthenticated `promoteToAdmin` mutation (privilege escalation, no creds), proved the
+same mutation works over **GET** and **form-encoded POST** (CSRF, no token / no
+JSON enforcement), and amplified an aliased `report` query to ~1 MB with no cost limit.
 
-Notavelmente, todos os cinco classificaram certo **sem mudança no classificador**:
-- o achado de amplificação por aliases → `dos`,
-- a mutation sem autenticação → `bfla`,
-- a mutation de GraphQL por GET → `csrf` — a classe adicionada no Lab 17 (OAuthForge)
-  **generalizou de forma limpa** para o CSRF de GraphQL,
-- introspecção → `graphql`,
-- cabeçalhos ausentes → `headers`.
+Notably, all five classified correctly with **no classifier change**:
+- the alias-amplification finding → `dos`,
+- the unauth mutation → `bfla`,
+- the GraphQL-over-GET mutation → `csrf` — the class added at Lab 17 (OAuthForge)
+  **generalised cleanly** to GraphQL CSRF,
+- introspection → `graphql`,
+- missing headers → `headers`.
 
-Este é o valor de um benchmark mesmo quando nada quebra: o Lab 20 confirma que o
-plugin lida com a superfície avançada de GraphQL — e que a classe `csrf`
-recém-adicionada não é específica de OAuth, mas cobre requisições que mudam estado
-entre sites em geral.
+This is the value of a benchmark even when nothing breaks: Lab 20 confirms the plugin
+handles the advanced GraphQL surface — and that the recently-added `csrf` class isn't
+OAuth-specific but covers cross-site state-changing requests generally.
 
-## Nota do laboratório
+## Lab note
 
-Um executor de GraphQL deliberadamente simplificado (substring/regex), fiel o
-bastante para demonstrar cada problema. Nada executa código; só dados de brincadeira.
+A deliberately simplified GraphQL executor (substring/regex), faithful enough to
+demonstrate each issue. Nothing executes code; play data only.
 
-## Rodar
+## Run it
 
 ```bash
 python labs/20-graphforge/app.py       # -> http://127.0.0.1:18821  (/graphql)

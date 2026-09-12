@@ -8,7 +8,7 @@
       "class": "race-condition",
       "severity": "critical",
       "route": "/redeem",
-      "desc": "Condição de corrida (TOCTOU) no resgate de voucher: o POST /redeem verifica voucher.used, depois credita a carteira e marca used=True SEM nenhum bloqueio entre a verificação e a ação. Disparando requisições concorrentes para um voucher de uso único, todas passam pela verificação antes de qualquer uma marcá-lo como usado, então o voucher é resgatado várias vezes e a carteira é creditada a mais. Só é encontrável enviando requisições em paralelo.",
+      "desc": "Race condition (TOCTOU) in voucher redemption: POST /redeem checks voucher.used, then credits the wallet and sets used=True with NO lock between check and act. Firing concurrent requests for a single-use voucher lets all of them pass the check before any marks it used, so the voucher is redeemed multiple times and the wallet is over-credited. Only findable by sending parallel requests.",
       "exploit": "Login -> fire ~20 concurrent POST /redeem {voucher:WELCOME50} -> balance ends up a multiple of 50 instead of 50 (voucher redeemed many times).",
       "points": 1
     },
@@ -17,7 +17,7 @@
       "class": "idor",
       "severity": "high",
       "route": "/wallet",
-      "desc": "IDOR: o GET /wallet?user=<nome> retorna o saldo e o perfil de QUALQUER usuário sem autenticação nem verificação de propriedade, então um atacante enumera e lê todas as contas.",
+      "desc": "IDOR: GET /wallet?user=<name> returns ANY user's balance and profile with no authentication or ownership check, so an attacker enumerates and reads every account.",
       "exploit": "GET /wallet?user=bob (with no/own session) -> bob's balance and profile.",
       "points": 1
     },
@@ -26,7 +26,7 @@
       "class": "mass-assignment",
       "severity": "high",
       "route": "/profile",
-      "desc": "Atribuição em massa: o POST /profile mescla cegamente todo o corpo da requisição na conta, então campos privilegiados que o cliente nunca deveria controlar (balance, is_admin) são aceitos e aplicados.",
+      "desc": "Mass assignment: POST /profile blindly merges the whole request body into the account, so privileged fields the client should never control (balance, is_admin) are accepted and applied.",
       "exploit": "POST /profile {\"balance\":1000000,\"is_admin\":true} with your own token -> wallet balance and admin flag set directly.",
       "points": 1
     },
@@ -35,7 +35,7 @@
       "class": "no-rate-limit",
       "severity": "medium",
       "route": "/login",
-      "desc": "Falta de rate limiting / bloqueio no POST /login: tentativas de credencial ilimitadas, sem throttle, atraso ou bloqueio, viabilizam força bruta e credential stuffing.",
+      "desc": "Lack of rate limiting / lockout on POST /login: unlimited credential attempts with no throttle, delay, or lockout enable brute force and credential stuffing.",
       "exploit": "Loop POST /login with candidate passwords -> no 429, no lockout, no delay.",
       "points": 1
     },
@@ -44,7 +44,7 @@
       "class": "headers",
       "severity": "low",
       "route": "*",
-      "desc": "Cabeçalhos de segurança ausentes em todas as respostas: sem Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options nem HSTS.",
+      "desc": "Missing security headers on all responses: no Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options, or HSTS.",
       "exploit": "curl -I any endpoint -> none of CSP/XFO/XCTO/HSTS present.",
       "points": 1
     }

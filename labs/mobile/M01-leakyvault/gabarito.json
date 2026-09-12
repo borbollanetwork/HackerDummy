@@ -9,7 +9,7 @@
       "class": "debuggable",
       "severity": "medium",
       "route": "*",
-      "desc": "android:debuggable=\"true\" vai no manifesto da aplicação, então qualquer usuário pode anexar um depurador JDWP ao processo em execução e ler ou alterar sua memória e seus dados em qualquer dispositivo.",
+      "desc": "android:debuggable=\"true\" ships in the application manifest, so any user can attach a JDWP debugger to the running process and read/modify its memory and data on any device.",
       "exploit": "grep android:debuggable AndroidManifest.xml -> true; on device: jdb / run-as without needing a custom-built debug APK.",
       "points": 1
     },
@@ -18,7 +18,7 @@
       "class": "backup-allowed",
       "severity": "medium",
       "route": "*",
-      "desc": "android:allowBackup=\"true\" permite extrair os dados privados do aplicativo (sandbox /data/data: SharedPrefs, SQLite) com `adb backup` em dispositivo sem root, além de restaurá-los e adulterá-los.",
+      "desc": "android:allowBackup=\"true\" lets the app's private data (/data/data sandbox: SharedPrefs, SQLite) be extracted with `adb backup` on a non-rooted device, and restored/tampered.",
       "exploit": "adb backup -f lv.ab com.leakyvault.app ; abe unpack lv.ab -> read cleartext prefs/db.",
       "points": 1
     },
@@ -27,7 +27,7 @@
       "class": "exported-component",
       "severity": "high",
       "route": "*",
-      "desc": "AdminActivity, SyncReceiver e NotesProvider estão com android:exported=\"true\" e SEM nenhuma permissão de proteção, então qualquer outro aplicativo instalado pode abrir a tela administrativa interna, enviar broadcast ao receiver e consultar o content provider.",
+      "desc": "AdminActivity, SyncReceiver and NotesProvider are android:exported=\"true\" with NO permission guard, so any other installed app can launch the internal admin screen, broadcast to the receiver, and query the content provider.",
       "exploit": "am start -n com.leakyvault.app/.AdminActivity ; am broadcast -a com.leakyvault.app.SYNC ; content query --uri content://com.leakyvault.app.notes",
       "points": 1
     },
@@ -36,7 +36,7 @@
       "class": "cleartext-traffic",
       "severity": "high",
       "route": "*",
-      "desc": "usesCleartextTraffic=\"true\" somado a um network_security_config com base-config em cleartextTrafficPermitted=\"true\" (e trust-anchors incluindo o repositório do usuário) faz todo o tráfego da API correr em http:// sem criptografia e confiar em ACs instaladas pelo usuário — trivialmente interceptável.",
+      "desc": "usesCleartextTraffic=\"true\" plus a network_security_config base-config with cleartextTrafficPermitted=\"true\" (and trust-anchors including the user store) means all API traffic runs over plaintext http:// and trusts user-installed CAs — trivially intercepted/MITM'd.",
       "exploit": "grep usesCleartextTraffic / res/xml/network_security_config.xml ; strings show http:// base_url; intercept with any proxy.",
       "points": 1
     },
@@ -45,7 +45,7 @@
       "class": "creds",
       "severity": "high",
       "route": "*",
-      "desc": "Uma chave de API do backend com aparência de produção e um segredo de assinatura HMAC estão embutidos em res/values/strings.xml, em assets/config.json e compilados no dex (ApiClient em smali) — qualquer um que desempacote o APK os recupera.",
+      "desc": "A live-shaped backend API key and an HMAC signing secret are hardcoded in res/values/strings.xml, in assets/config.json, and compiled into the dex (smali ApiClient) — anyone unpacking the APK recovers them.",
       "exploit": "unzip apk ; grep -rEi 'api_key|hmac|secret|lv_live' res/ assets/ smali/ -> lv_live_... + signing secret.",
       "points": 1
     }

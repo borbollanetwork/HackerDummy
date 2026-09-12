@@ -1,51 +1,46 @@
-# Lab 19 — SmuggleForge — Resultados
+# Lab 19 — SmuggleForge — Results
 
-O primeiro lab de **contrabando de requisições HTTP** — e uma dessincronização
-front-end/back-end *genuína*, não uma imitação. Duas camadas de socket bruto, só com a
-biblioteca padrão, que deliberadamente discordam sobre o enquadramento do corpo: o
-front-end (alvo, :18819) delimita por `Content-Length` e bloqueia `/admin`; o back-end
-(:18820, interno) respeita `Transfer-Encoding: chunked` e serve `/admin`. Um payload
-CL.TE contrabandeia uma requisição ao `/admin` interno passando pelo bloqueio do
-front-end.
+The first **HTTP request smuggling** lab — and a *genuine* front-end/back-end desync,
+not a mock. Two stdlib raw-socket tiers that deliberately disagree on body framing:
+the front-end (target, :18819) delimits by `Content-Length` and blocks `/admin`; the
+back-end (:18820, internal) honours `Transfer-Encoding: chunked` and serves `/admin`.
+A CL.TE payload smuggles a request to the internal `/admin` past the front-end block.
 
-## Resultado: o plugin executou um ataque de dessincronização real
+## Result: the plugin performed a real desync attack
 
-Dado um prompt guiado por metodologia (sem exploit entregue), o especialista de
-contrabando às cegas leu os banners de `Server`, inferiu a arquitetura de duas
-camadas, diagnosticou **CL.TE**, escreveu uma requisição de socket bruto exata em
-bytes (Content-Length cobrindo um `GET /admin` contrabandeado após o terminador de
-chunk `0\r\n\r\n`) e **recuperou o segredo do admin interno** que uma requisição
-direta a `/admin` devolve como 403. Este é o ataque de protocolo mais profundo da
-suíte — dessincronização HTTP genuína, feita às cegas.
+Given a methodology-driven prompt (no exploit handed over), the blind smuggling
+specialist read the `Server` banners, inferred the two-tier architecture, diagnosed
+**CL.TE**, wrote a byte-exact raw-socket request (Content-Length covering a smuggled
+`GET /admin` after the `0\r\n\r\n` chunk terminator), and **recovered the internal
+admin secret** that a direct `/admin` request 403s on. This is the deepest protocol
+attack in the suite — genuine HTTP desync, done blind.
 
-## Nota
+## Score
 
-| Passada | Recall | Precisão | Notas |
-|---------|--------|----------|-------|
-| Linha de base | **2/3 (67%)** | 50% | o achado de contrabando não tinha classe (caiu em `other`/`ssrf`) |
-| Após correção | **3/3 (100%)** | — | banner + cabeçalhos ausentes são os outros dois; zero falso positivo |
+| Pass | Recall | Precision | Notes |
+|------|--------|-----------|-------|
+| Baseline | **2/3 (67%)** | 50% | the smuggling finding had no class (fell to `other`/`ssrf`) |
+| After fix | **3/3 (100%)** | — | banner + missing-headers are the other two; zero false positives |
 
-## A lacuna que este laboratório revelou
+## The gap this lab exposed
 
-**Nova classe: `smuggling` (CWE-444).** O agente confirmou a dessincronização CL.TE
-mas nenhum classificador tinha uma classe de contrabando de requisições, então caiu.
-Adicionada `smuggling` (request/response smuggling, CL.TE / TE.CL / TE.TE, HTTP
-desync, conflito chunked-vs-CL) aos dois classificadores + `TAXONOMY.md`, colocada ao
-lado de `crlf` (e verificado que NÃO colide com CRLF/divisão de resposta). Os outros
-dois achados plantados (banner de `version`, `headers` ausentes) classificaram certo
-de saída.
+**New class: `smuggling` (CWE-444).** The agent confirmed the CL.TE desync but neither
+classifier had a request-smuggling class, so it fell through. Added `smuggling`
+(request/response smuggling, CL.TE / TE.CL / TE.TE, HTTP desync, chunked-vs-CL
+conflict) to both classifiers + `TAXONOMY.md`, placed next to `crlf` (and verified it
+does NOT collide with CRLF/response-splitting). The other two planted findings
+(`version` banner, missing `headers`) classified correctly out of the box.
 
-## Nota do laboratório
+## Lab note
 
-A dessincronização é real (dois servidores de socket bruto com lógica de enquadramento
-de corpo genuinamente diferente), então reproduz só com requisições exatas em bytes —
-exatamente como o bug real. O único "segredo" é uma flag de laboratório; nada executa
-código. O back-end devolve 404 em caminhos desconhecidos para uma varredura de
-conteúdo não ver a wordlist inteira como 200.
+The desync is real (two raw-socket servers with genuinely different body-framing
+logic), so it reproduces only with byte-exact requests — exactly like the real bug.
+The only "secret" is a lab flag; nothing executes code. The back-end 404s unknown
+paths so a content scan doesn't see the whole wordlist as 200.
 
-## Rodar
+## Run it
 
 ```bash
-python labs/19-smuggleforge/app.py     # front-end (alvo) -> http://127.0.0.1:18819
-#                                        (o back-end roda internamente na 18820)
+python labs/19-smuggleforge/app.py     # front-end (target) -> http://127.0.0.1:18819
+#                                        (back-end runs internally on 18820)
 ```

@@ -1,58 +1,55 @@
-# Lab 06 — OpenServices — Resultados
+# Lab 06 — OpenServices — Results
 
-Pontuação da esteira contra um host que expõe 8 serviços de rede mal configurados
-(infraestrutura, não web). O agente rodou **às cegas**, restrito às 8 portas do
-laboratório no escopo (o SMB/445 real do host ficou explicitamente fora de escopo
-e intocado).
+Scoring the pipeline against a host exposing 8 misconfigured network services
+(infra, not web). The agent ran **blind**, scoped strictly to the 8 in-scope lab
+ports (the host's real SMB/445 was explicitly out of scope and untouched).
 
-## O que este laboratório validou (reconhecimento de infraestrutura)
+## What this lab validated (infra recon)
 
-O `service_scan.py` contra `127.0.0.1` conectou nas portas de serviço padrão e
-emitiu os sinais certos por serviço — `redis-exposed`, `elastic-exposed`,
+`service_scan.py` against `127.0.0.1` connected to the standard service ports and
+emitted the right per-service signals — `redis-exposed`, `elastic-exposed`,
 `mongodb-exposed`, `couchdb-exposed`, `docker-exposed`, `memcached-exposed`,
-`mysql-exposed`, `http-alt-port` (e corretamente também sinalizou o
-`smb-exposed` real do host na 445, que mantivemos fora de escopo). A etapa de
-varredura de portas de infraestrutura + banner + sinal funciona.
+`mysql-exposed`, `http-alt-port` (and correctly also flagged the host's real
+`smb-exposed` on 445, which we kept out of scope). The infra port-scan + banner +
+signal step works.
 
-## Nota
+## Score
 
-| Passada     | Recall        | Precisão | Notas |
-|-------------|---------------|----------|-------|
-| Linha de base | **0/8 (0%)**  | 0%      | NENHUM vocabulário de infraestrutura |
-| Após correção | **8/8 (100%)**| 100%    | +2 classes de infraestrutura |
+| Pass        | Recall        | Precision | Notes |
+|-------------|---------------|-----------|-------|
+| Baseline    | **0/8 (0%)**  | 0%        | NO infra vocabulary at all |
+| After fix   | **8/8 (100%)**| 100%      | +2 infra classes |
 
-O agente às cegas confirmou todos os 8 (Redis 2.8.0 sem autenticação,
-Elasticsearch 1.4.2 sem autenticação, MongoDB sem autenticação, CouchDB admin
-party, Docker API 19.03.5 sem TLS, Memcached 1.4.15, MySQL 5.5.62 em fim de vida e
-o `admin/admin` do painel admin). Zero falso positivo, todos os vetores de RCE
-documentados como teóricos (não detonados).
+The blind agent confirmed all 8 (Redis 2.8.0 no-auth, Elasticsearch 1.4.2
+no-auth, MongoDB no-auth, CouchDB admin-party, Docker API 19.03.5 no-TLS,
+Memcached 1.4.15, MySQL 5.5.62 EOL, and the admin panel's `admin/admin`). Zero
+false positives, all RCE vectors documented as theoretical (not detonated).
 
-## A lacuna que este laboratório revelou — a maior até aqui
+## The gap this lab exposed — the largest yet
 
-O recall da linha de base foi **0%**. O motor **não tinha classe para serviço de
-rede exposto nem para credenciais padrão**, então os oito achados se espalharam
-para os baldes errados — "Exposed Redis" → `rce` (o corpo menciona RCE por cron),
-"Exposed MySQL" → `sqli`/`other`, "Default credentials" → `creds`. A detecção foi
-perfeita; a classificação, ausente.
+Baseline recall was **0%**. The engine had **no class for exposed network
+services or default credentials**, so the eight findings scattered into the
+wrong buckets — "Exposed Redis" → `rce` (its body mentions cron-RCE), "Exposed
+MySQL" → `sqli`/`other`, "Default credentials" → `creds`. Detection was perfect;
+classification was absent.
 
-Correção (motor):
+Fix (engine):
 
-| Classe | CWE | Pega |
-|--------|-----|------|
-| `exposed-service` | 306 | Redis/Elastic/Mongo/CouchDB/Docker/Memcached/MySQL/… alcançável sem autenticação (autenticação ausente numa função crítica) |
-| `default-creds` | 1392 | credenciais padrão/nunca trocadas (`admin/admin`, root sem senha, …) |
+| Class | CWE | Catches |
+|-------|-----|---------|
+| `exposed-service` | 306 | Redis/Elastic/Mongo/CouchDB/Docker/Memcached/MySQL/… reachable without authentication (missing auth on a critical function) |
+| `default-creds` | 1392 | default/unchanged credentials (`admin/admin`, root-no-password, …) |
 
-`default-creds` foi colocada **antes** de `creds` no classificador, porque
-"Default **credential**s" seria de outro modo pega pela classe genérica de
-exposição de credencial. Ambas trazem CVSS + ≥3 referências de endurecimento
-(OWASP/CIS/CWE).
+`default-creds` was placed **before** `creds` in the classifier, because
+"Default **credential**s" would otherwise be grabbed by the generic credential-
+exposure class. Both ship CVSS + ≥3 hardening references (OWASP/CIS/CWE).
 
-Repontuação: **8/8, 100% de precisão**. Regressão: labs 01-05 todos inalterados.
+Re-score: **8/8, 100% precision**. Regression: Labs 01-05 all unchanged.
 
-## Pontos fortes confirmados
+## Strong points confirmed
 
-- O subsistema de infraestrutura (`service_scan`) fez a impressão digital de todo
-  serviço e emitiu sinais corretos num host multiserviço.
-- O agente às cegas pegou toda versão, confirmou toda condição de sem
-  autenticação/credencial padrão e respeitou o escopo (nunca tocou no serviço SMB
-  real) — uma demonstração limpa de teste de infraestrutura autorizado e escopado.
+- The infra subsystem (`service_scan`) fingerprinted every service and emitted
+  correct signals on a multi-service host.
+- The blind agent grabbed every version, confirmed every no-auth/default-cred
+  condition, and respected scope (never touched the real SMB service) — a clean
+  demonstration of authorized, scoped infra testing.
