@@ -241,7 +241,7 @@ def start_labs(use_color, startup_timeout):
         print(paint("[!] Nenhum lab executável encontrado em ./labs", C.RED, use_color))
         sys.exit(1)
     table_header(use_color)
-    all_ready = True
+    ready_count = 0
     for position, folder in enumerate(lab_dirs, start=1):
         index = lab_number(folder) or position
         command = resolve_lab_command(folder)
@@ -262,10 +262,10 @@ def start_labs(use_color, startup_timeout):
             ready = alive and port is not None
             if alive and not ready:
                 stop_proc(lab)
-            all_ready = all_ready and ready
+            if ready:
+                ready_count += 1
             table_row(index, folder.name, "UP" if ready else "DOWN", port or "N/A", use_color)
         except Exception as exc:
-            all_ready = False
             with open(log_file, "ab", buffering=0) as log:
                 log.write(f"ERROR: {exc}\n".encode())
             table_row(index, folder.name, "DOWN", "N/A", use_color)
@@ -275,7 +275,7 @@ def start_labs(use_color, startup_timeout):
         tag = m.group(1) if m else "MOB"
         table_row(tag, f"mobile/{folder.name}", "STATIC", "jadx/apktool", use_color)
     _border("└", "┴", "┘", use_color)
-    return all_ready
+    return ready_count, len(lab_dirs)
 
 
 def run_lock(action, use_color):
@@ -343,12 +343,15 @@ def main():
         print(paint("[!] Lock falhou; nenhum lab será iniciado.", C.BOLD + C.RED, USE_COLOR))
         sys.exit(2)
     print()
-    if not start_labs(USE_COLOR, args.timeout):
-        print(paint("\n[!] Um ou mais labs falharam no startup; encerrando a rodada.",
-                    C.BOLD + C.RED, USE_COLOR))
+    ready, total = start_labs(USE_COLOR, args.timeout)
+    if ready == 0:
+        print(paint("\n[!] Nenhum lab subiu; encerrando a rodada.", C.BOLD + C.RED, USE_COLOR))
         stop_labs(USE_COLOR)
         sys.exit(3)
-    print("\n" + paint("[+] Todos os labs disponíveis foram processados.", C.BOLD + C.GREEN, USE_COLOR))
+    if ready < total:
+        print("\n" + paint(f"[!] {total - ready} lab(s) não subiram; seguindo com os {ready} no ar.",
+                           C.BOLD + C.YELLOW, USE_COLOR))
+    print("\n" + paint(f"[+] Labs no ar: {ready}/{total}.", C.BOLD + C.GREEN, USE_COLOR))
     print(paint("[+] Gabaritos TRAVADOS. Dê CTRL+C só quando o agente terminar o pentest — o unlock libera o gabarito p/ a Comparação.", C.BOLD + C.YELLOW, USE_COLOR))
     print(paint(f"[+] Logs: {LOG_DIR}\n", C.DIM + C.WHITE, USE_COLOR))
     try:
