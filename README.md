@@ -61,7 +61,7 @@ um número e fecha o ciclo:
 
 Use para **avaliar** um agente em um alvo conhecido, **comparar** modelos e
 prompts lado a lado, **pegar regressões** quando mudar algo, e **fazer ajuste
-fino**: os gabaritos são rótulos de verdade fundamental — o que o agente deixou
+fino**: os gabaritos são rótulos de ground truth — o que o agente deixou
 passar e os falsos positivos dele são exatamente o sinal de supervisão que você
 usa para treinar.
 
@@ -196,10 +196,10 @@ de vulnerabilidades plantadas no gabarito daquele laboratório.
 | 09 | [InjectArena](labs/09-injectarena/) | Injeção além de SQL — operador NoSQL, LDAP, XPath, SSI, CSV e fórmula | 5 |
 | 10 | [UploadForge](labs/10-uploadforge/) | Envio de arquivos — envio irrestrito → webshell → RCE, cadeia de credenciais padrão, leitura por travessia, XSS armazenado em SVG, IDOR | 7 |
 | 11 | [LegacyPortal](labs/11-legacyportal/) | Wrappers de LFI no PHP — divulgação com `php://filter`, travessia, poliglota upload→LFI→RCE, phpinfo, desvio de autenticação por type juggling | 6 |
-| 12 | [CloudPivot](labs/12-cloudpivot/) | **Encadeamento** — SSRF → roubo de credencial da role da instância pelo IMDS → reuso de token → RCE (cada passo destrava o seguinte) | 5 |
+| 12 | [CloudPivot](labs/12-cloudpivot/) | **Encadeamento** — SSRF → roubo de credencial da role da instância pelo IMDS → reuso de token → RCE (cada passo habilita o seguinte) | 5 |
 | 13 | [AspNetVault](labs/13-aspnetvault/) | .NET / IIS — `web.config` exposto (connectionStrings e machineKey), desserialização de ViewState, visualizador de trace, banners de versão | 5 |
 | 14 | [ClientForge](labs/14-clientforge/) | Lado do cliente — XSS de DOM (`location.hash`→`innerHTML`), poluição de protótipo, redirecionamento aberto no DOM, segredo embutido no JS, CSP ausente | 5 |
-| 15 | [RaceVault](labs/15-racevault/) | Lógica de negócio — **condição de corrida** real (gasto duplo de voucher por TOCTOU), IDOR, atribuição em massa, sem limite de taxa | 5 |
+| 15 | [RaceVault](labs/15-racevault/) | Lógica de negócio — **condição de corrida** real (double-spend de voucher por TOCTOU), IDOR, atribuição em massa, sem limite de taxa | 5 |
 | 16 | [SamlForge](labs/16-samlforge/) | SSO / SAML — assinatura da asserção não verificada (desvio de autenticação), XXE via SAMLResponse, redirecionamento aberto no RelayState, erros verbosos | 5 |
 | 17 | [OAuthForge](labs/17-oauthforge/) | OAuth 2.0 / OIDC — `redirect_uri` sem validação, `state` ausente (CSRF), reuso de código de autorização, downgrade de PKCE e ausência de autenticação do cliente | 5 |
 | 18 | [JavaForge](labs/18-javaforge/) | **Desserialização nativa do Java** (`rO0AB` → gadget → RCE), credenciais padrão do Tomcat, stack traces Java, pilha em fim de vida | 5 |
@@ -305,7 +305,7 @@ exatamente para o que serve o HackerDummy, com qualquer agente que você traga.
 
 Os gabaritos fazem de cada laboratório um **conjunto de dados rotulado**:
 
-- **Verdade fundamental** = `gabarito.json` (classe, rota e forma de exploração de cada vulnerabilidade).
+- **Ground truth** = `gabarito.json` (classe, rota e forma de exploração de cada vulnerabilidade).
 - **Supervisão** = rode o seu agente e compare com o gabarito. As falhas são
   negativos difíceis; os falsos positivos são ruído a penalizar. Monte sinal de
   SFT, DPO ou RL a partir dessa diferença.
