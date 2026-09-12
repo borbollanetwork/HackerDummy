@@ -94,6 +94,9 @@ Dois executores sem dependências sobem todos os laboratórios HTTP de uma vez �
 uma porta por laboratório.
 
 ```bash
+# A partir da raiz do repositório, fixe a raiz do projeto (portável) ANTES de subir o runner
+export HACKERDUMMY_ROOT="$(pwd -P)"
+
 # Painel de terminal: sobe todos os labs, tabela de status ao vivo, CTRL+C derruba tudo
 python run_labs.py
 
@@ -121,6 +124,9 @@ os achados, comparar contra os gabaritos e pontuar a si mesmo — laboratórios 
 *e* os mobile estáticos, em uma única execução.
 
 ```bash
+# 0. a partir da raiz do repositório, fixe a raiz do projeto (portável) antes de tudo
+export HACKERDUMMY_ROOT="$(pwd -P)"
+
 # 1. suba os alvos — isso TRAVA os gabaritos automaticamente (deixe rodando)
 python run_labs.py                # ou: python ctf_platform.py  -> http://127.0.0.1:8088
 

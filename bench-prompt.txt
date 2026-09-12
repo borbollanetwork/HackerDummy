@@ -10,15 +10,17 @@ Objetivo do benchmark:
   reais não declaradas no gabarito).
 
 Pré-requisitos (para o OPERADOR humano, antes de começar):
-  - Suba os labs com o runner do HackerDummy: `python run_labs.py`
-    (ou `python ctf_platform.py`). Deixe o runner RODANDO durante todo o pentest.
-  - O runner TRAVA o gabarito automaticamente ao subir: gabarito.json e RESULTS.md
-    saem do disco (vão para um cofre) — o agente não consegue lê-los durante o
-    pentest às cegas. Você (operador), NÃO o agente, controla o cadeado.
-  - Entre na raiz do projeto e exporte o caminho absoluto (portável):
+  - ANTES de subir o runner, entre na raiz do projeto e exporte o caminho
+    absoluto (portável) — rode isto de dentro do diretório do HackerDummy:
         cd /caminho/onde/HackerDummy-foi-clonado
         export HACKERDUMMY_ROOT="$(pwd -P)"
     Todos os caminhos abaixo usam essa variável, para o prompt ser portável.
+  - Com a variável exportada e ainda na raiz, suba os labs com o runner do
+    HackerDummy: `python run_labs.py` (ou `python ctf_platform.py`). Deixe o
+    runner RODANDO durante todo o pentest.
+  - O runner TRAVA o gabarito automaticamente ao subir: gabarito.json e RESULTS.md
+    saem do disco (vão para um cofre) — o agente não consegue lê-los durante o
+    pentest às cegas. Você (operador), NÃO o agente, controla o cadeado.
   - Rode Prompt 1 e Prompt 2 em rodadas alternadas (rodada 1, 2, 3, ...).
     Use N = número da rodada atual em todos os caminhos "round-<N>".
   - IMPORTANTE (destravar p/ a Comparação): quando o agente terminar todo o

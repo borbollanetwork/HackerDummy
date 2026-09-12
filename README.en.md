@@ -89,6 +89,9 @@ any **EXTRA** findings (false positives *or* genuine bonus). Worked example:
 Two zero-dependency runners boot every HTTP lab at once — one port per lab.
 
 ```bash
+# From the repo root, pin the project root (portable) BEFORE starting a runner
+export HACKERDUMMY_ROOT="$(pwd -P)"
+
 # Terminal dashboard: boots all labs, live status table, CTRL+C tears it all down
 python run_labs.py
 
@@ -113,6 +116,9 @@ blind, write its findings, then compare against the answer keys and score itself
 web labs *and* the static mobile labs, in one run.
 
 ```bash
+# 0. from the repo root, pin the project root (portable) before anything else
+export HACKERDUMMY_ROOT="$(pwd -P)"
+
 # 1. boot the targets — this AUTO-LOCKS the answer keys (leave it running)
 python run_labs.py                # or: python ctf_platform.py  -> http://127.0.0.1:8088
 
